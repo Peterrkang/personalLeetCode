@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flashcards</title>
+<link rel="stylesheet" href="style.css">
+<style>
+/* ---- Flashcards page-specific styles ---- */
+.fc-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0 8px; }
+.fc-toolbar .spacer { flex: 1 1 auto; }
+.fc-stat { color: var(--muted); font-size: 14px; }
+.fc-stat b { color: var(--accent-2); }
+
+/* Deck filter chips (reuses .toc look) */
+.fc-decks { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 18px; }
+.fc-decks button {
+  font: inherit; cursor: pointer;
+  padding: 5px 12px; font-size: 13px; line-height: 1.3;
+  color: var(--accent); background: var(--panel-2);
+  border: 1px solid var(--border); border-radius: 999px;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.fc-decks button:hover { border-color: var(--accent); }
+.fc-decks button.active { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+.fc-decks button .count { opacity: .7; font-size: 12px; }
+
+/* The card (3D flip) */
+.fc-stage { perspective: 1400px; margin: 10px 0 18px; }
+.fc-card {
+  position: relative; width: 100%; min-height: 280px;
+  cursor: pointer; transform-style: preserve-3d;
+  transition: transform .5s cubic-bezier(.4,.2,.2,1);
+}
+.fc-card.flipped { transform: rotateY(180deg); }
+.fc-face {
+  position: absolute; inset: 0; backface-visibility: hidden;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 32px 36px; border-radius: 14px;
+  border: 1px solid var(--border); background: var(--panel);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+.fc-face .fc-kicker { position: absolute; top: 16px; left: 24px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.fc-face .fc-box { position: absolute; top: 16px; right: 24px; font-size: 12px; color: var(--muted); }
+.fc-face .fc-box b { color: var(--accent-2); }
+.fc-front { background: var(--panel); }
+.fc-back { transform: rotateY(180deg); background: var(--panel-2); }
+.fc-q { font-size: 22px; font-weight: 600; color: #fff; line-height: 1.5; }
+.fc-a { font-size: 16px; color: var(--text); line-height: 1.7; }
+.fc-a code, .fc-q code { background: rgba(0,0,0,0.3); }
+.fc-hint { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; color: var(--muted); font-size: 12px; }
+
+/* Controls */
+.fc-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 14px 0; }
+.fc-controls .spacer { flex: 1 1 auto; }
+.fc-btn {
+  font: inherit; cursor: pointer; font-size: 14px;
+  padding: 9px 16px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+  transition: background .15s, color .15s, border-color .15s, transform .05s;
+}
+.fc-btn:hover { border-color: var(--accent); }
+.fc-btn:active { transform: translateY(1px); }
+.fc-btn:disabled { opacity: .4; cursor: default; }
+.fc-btn.again { border-color: rgba(255,107,107,0.5); color: #ff8a8a; }
+.fc-btn.again:hover { background: rgba(255,107,107,0.12); }
+.fc-btn.good { border-color: rgba(126,231,135,0.5); color: var(--accent-2); }
+.fc-btn.good:hover { background: rgba(126,231,135,0.12); }
+.fc-counter { color: var(--muted); font-size: 14px; min-width: 70px; text-align: center; }
+
+.fc-empty { text-align: center; color: var(--muted); padding: 60px 20px; }
+.fc-empty b { color: var(--accent-2); }
+.kbd { display: inline-block; font-family: "SF Mono", Consolas, Monaco, monospace; font-size: 12px; background: var(--panel-2); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text); }
+.fc-legend { color: var(--muted); font-size: 13px; margin: 8px 0; }
+.fc-legend .kbd { margin: 0 2px; }
+</style>
+</head>
+<body>
+<nav><div class="inner">
+  <span class="brand">📚 Prep Plan</span>
+  <a href="index.html">Overview</a>
+  <a href="system-design-curriculum.html">SD Curriculum</a>
+  <a href="../system-design/index.html">SD Notes</a>
+  <a href="dsa-patterns.html">Patterns</a>
+  <a href="algo-templates.html">Boiler Plate</a>
+  <a href="js-ts-cheatsheet.html">JS Cheatsheet</a>
+  <a href="flashcards.html" class="active">Flashcards</a>
+  <a href="playground.html">Playground</a>
+</div></nav>
+<div class="wrap">
+
+<h1>Flashcards</h1>
+<p class="subtitle">Spaced-repetition review for Block 4. Flip, rate yourself, repeat until mastered.</p>
+
+<div class="progress-bar"><div class="progress-fill" id="fc-progress"></div></div>
+
+<div class="fc-toolbar">
+  <span class="fc-stat" id="fc-summary">—</span>
+  <span class="spacer"></span>
+  <button class="reset-btn" id="fc-shuffle" title="Shuffle the current deck">🔀 Shuffle</button>
+  <button class="reset-btn" id="fc-reset" title="Clear all saved progress">↺ Reset progress</button>
+</div>
+
+<div class="fc-decks" id="fc-decks"></div>
+
+<div class="fc-stage">
+  <div class="fc-card" id="fc-card">
+    <div class="fc-face fc-front">
+      <span class="fc-kicker" id="fc-kicker-front">Question</span>
+      <span class="fc-box" id="fc-box-front"></span>
+      <div class="fc-q" id="fc-question">Loading…</div>
+      <div class="fc-hint">Click or press <span class="kbd">Space</span> to flip</div>
+    </div>
+    <div class="fc-face fc-back">
+      <span class="fc-kicker">Answer</span>
+      <div class="fc-a" id="fc-answer"></div>
+      <div class="fc-hint">Rate yourself below — or press <span class="kbd">1</span> / <span class="kbd">2</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="fc-controls">
+  <button class="fc-btn" id="fc-prev" title="Previous card (←)">‹ Prev</button>
+  <span class="fc-counter" id="fc-counter">0 / 0</span>
+  <button class="fc-btn" id="fc-next" title="Next card (→)">Next ›</button>
+  <span class="spacer"></span>
+  <button class="fc-btn again" id="fc-again" title="Got it wrong — reset to box 1 (1)">✗ Again</button>
+  <button class="fc-btn good" id="fc-good" title="Got it — promote a box (2)">✓ Got it</button>
+</div>
+
+<p class="fc-legend">
+  <span class="kbd">Space</span> flip ·
+  <span class="kbd">←</span> <span class="kbd">→</span> navigate ·
+  <span class="kbd">1</span> again ·
+  <span class="kbd">2</span> got it ·
+  <span class="kbd">S</span> shuffle
+</p>
+
+<div class="callout tip">
+  <strong>How mastery works (Leitner system):</strong> every card lives in a box from <b>1</b> (new / shaky) to <b>5</b> (mastered).
+  <b>✓ Got it</b> promotes a card one box; <b>✗ Again</b> sends it back to box 1. A card counts as <em>mastered</em> at box 5.
+  Progress is saved in your browser, per card.
+</div>
+
+<script src="flashcards.js"></script>
+</body>
+</html>

@@ -1,0 +1,1850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Personal LeetCode</title>
+
+<!-- CodeMirror 6 (editor + syntax highlighting), loaded as ES modules.
+     The `?external=` params force esm.sh to share a single copy of the core
+     packages (@codemirror/state, @lezer/*) across every module — without this,
+     CM6 throws "Unrecognized extension value" from duplicated state packages. -->
+<script type="importmap">
+{
+  "imports": {
+    "@codemirror/state": "https://esm.sh/@codemirror/state@6",
+    "@codemirror/view": "https://esm.sh/@codemirror/view@6?external=@codemirror/state",
+    "@codemirror/language": "https://esm.sh/@codemirror/language@6?external=@codemirror/state,@codemirror/view,@lezer/common,@lezer/highlight,@lezer/lr",
+    "@codemirror/commands": "https://esm.sh/@codemirror/commands@6?external=@codemirror/state,@codemirror/view,@codemirror/language",
+    "@codemirror/lint": "https://esm.sh/@codemirror/lint@6?external=@codemirror/state,@codemirror/view",
+    "@codemirror/search": "https://esm.sh/@codemirror/search@6?external=@codemirror/state,@codemirror/view",
+    "@codemirror/autocomplete": "https://esm.sh/@codemirror/autocomplete@6?external=@codemirror/state,@codemirror/view,@codemirror/language",
+    "@codemirror/lang-javascript": "https://esm.sh/@codemirror/lang-javascript@6?external=@codemirror/state,@codemirror/view,@codemirror/language,@codemirror/autocomplete,@lezer/common,@lezer/highlight,@lezer/javascript,@lezer/lr",
+    "@lezer/common": "https://esm.sh/@lezer/common@1",
+    "@lezer/lr": "https://esm.sh/@lezer/lr@1?external=@lezer/common",
+    "@lezer/highlight": "https://esm.sh/@lezer/highlight@1?external=@lezer/common",
+    "@lezer/javascript": "https://esm.sh/@lezer/javascript@1?external=@lezer/common,@lezer/lr,@lezer/highlight",
+    "codemirror": "https://esm.sh/codemirror@6.0.2?external=@codemirror/state,@codemirror/view,@codemirror/language,@codemirror/commands,@codemirror/search,@codemirror/autocomplete,@codemirror/lint,@lezer/common,@lezer/highlight"
+  }
+}
+</script>
+
+<style>
+  :root {
+    --bg: #1e1e1e;
+    --panel: #252526;
+    --panel2: #2d2d30;
+    --border: #3c3c3c;
+    --text: #d4d4d4;
+    --muted: #858585;
+    --accent: #0e639c;
+    --accent-hover: #1177bb;
+    --green: #4ec9b0;
+    --red: #f48771;
+    --mono: "Cascadia Code", "Consolas", "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Sidebar */
+  #sidebar {
+    width: 230px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+  body.sidebar-collapsed #sidebar { display: none; }
+  /* Drag handle to resize the sidebar. Sits on its right edge, mirroring
+     #desc-resizer. Hidden while the sidebar is collapsed. */
+  #sidebar-resizer {
+    width: 5px;
+    flex-shrink: 0;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.12s;
+  }
+  #sidebar-resizer:hover,
+  body.sidebar-resizing #sidebar-resizer { background: var(--accent); }
+  body.sidebar-collapsed #sidebar-resizer { display: none; }
+  body.sidebar-resizing { cursor: col-resize; user-select: none; }
+  body.sidebar-resizing iframe { pointer-events: none; }
+  #sidebar-head {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+  #sidebar h1 {
+    flex: 1;
+    font-size: 14px;
+    padding: 14px 16px;
+    margin: 0;
+    letter-spacing: 0.3px;
+  }
+  .icon-btn {
+    background: none;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1;
+    padding: 8px 12px;
+    border-radius: 0;
+  }
+  .icon-btn:hover { background: var(--panel2); color: var(--text); }
+
+  /* Completed progress */
+  #progress {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  #progress .bar {
+    height: 5px;
+    background: var(--panel2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  #progress .fill {
+    height: 100%;
+    background: var(--green);
+    width: 0;
+    transition: width 0.2s ease;
+  }
+  #progress .label { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  #progress .label b { color: var(--green); font-weight: 600; }
+
+  /* Filter bar (search + difficulty/status chips) above the list */
+  #filter {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  #filter-search {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 6px 9px;
+    font-family: inherit;
+    font-size: 12.5px;
+  }
+  #filter-search:focus { outline: none; border-color: var(--accent-hover); }
+  #filter-search::placeholder { color: var(--muted); }
+  .filter-row { display: flex; gap: 4px; flex-wrap: wrap; }
+  .filter-chip {
+    background: var(--panel2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 2px 9px;
+    font-size: 11px;
+    cursor: pointer;
+    text-transform: capitalize;
+    letter-spacing: 0.3px;
+  }
+  .filter-chip:hover { color: var(--text); }
+  .filter-chip.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  #problem-empty {
+    padding: 16px 14px;
+    font-size: 12.5px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  #problem-list { overflow-y: auto; flex: 1; }
+  .problem-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .problem-item:hover { background: var(--panel2); }
+  .problem-item.active { background: var(--accent); color: #fff; }
+  .problem-item .status { font-size: 11px; width: 12px; flex-shrink: 0; }
+  .problem-item .solved { color: var(--green); }
+  .problem-item.active .solved { color: #b6f5e6; }
+  .difficulty {
+    margin-left: auto;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.8;
+  }
+  .diff-easy { color: var(--green); }
+  .diff-medium { color: #dcdcaa; }
+  .diff-hard { color: var(--red); }
+  .problem-item.active .difficulty { color: #fff; }
+
+  /* Middle: description */
+  #description {
+    width: 400px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 22px 24px 32px;
+  }
+  /* Drag handle to resize the description pane. Sits on its right edge. */
+  #desc-resizer {
+    width: 5px;
+    flex-shrink: 0;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.12s;
+  }
+  #desc-resizer:hover,
+  body.desc-resizing #desc-resizer { background: var(--accent); }
+  /* While dragging, kill text selection and pointer lag across the page. */
+  body.desc-resizing { cursor: col-resize; user-select: none; }
+  body.desc-resizing iframe { pointer-events: none; }
+  #description h2 {
+    margin: 0 0 14px;
+    font-size: 17px;
+    line-height: 1.35;
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    flex-wrap: wrap;
+  }
+  #description h2 .difficulty { margin-left: 0; }
+  .complexity {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 18px;
+  }
+  .cx-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+  }
+  .cx-item {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 8px;
+  }
+  .cx-item b { color: var(--green); font-weight: 600; }
+  #description p { line-height: 1.65; font-size: 13.5px; margin: 0 0 12px; }
+  #description p:last-of-type { margin-bottom: 0; }
+
+  /* Section label (Examples, etc.) */
+  #description .sec-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    margin: 22px 0 9px;
+  }
+
+  #description pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    /* Keep example alignment intact; scroll horizontally only if needed. */
+    white-space: pre;
+    overflow-x: auto;
+    margin: 0;
+  }
+  #description pre.examples::-webkit-scrollbar { height: 7px; }
+  #description pre.examples::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+  #description code {
+    font-family: var(--mono);
+    background: var(--bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12.5px;
+    word-break: break-word;
+  }
+  #description pre code { background: none; padding: 0; font-size: inherit; }
+
+  /* Approach callout */
+  #description .approach {
+    margin-top: 16px;
+    padding: 11px 13px;
+    background: rgba(78, 201, 176, 0.07);
+    border-left: 3px solid var(--green);
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  #description .approach b {
+    color: var(--green);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+  #description .approach .approach-sep { color: var(--muted); }
+
+  /* Per-problem notes */
+  #notes-section { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 14px; }
+  #notes-section .notes-head { display: flex; align-items: center; margin: 0 0 8px; }
+  #notes-section h3 { font-size: 12px; margin: 0; color: var(--green); text-transform: uppercase; letter-spacing: 0.5px; }
+  #notes-saved { font-size: 11px; color: var(--muted); margin-left: auto; opacity: 0; transition: opacity 0.3s; }
+  #notes-saved.show { opacity: 1; }
+  #notes-area {
+    width: 100%;
+    min-height: 130px;
+    resize: vertical;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  #notes-area:focus { outline: none; border-color: var(--accent-hover); }
+  #notes-area::placeholder { color: var(--muted); }
+
+  /* Right: editor + results */
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--panel2);
+    border-bottom: 1px solid var(--border);
+  }
+  #toolbar .spacer { flex: 1; }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    border: none;
+    border-radius: 5px;
+    padding: 7px 16px;
+    cursor: pointer;
+    color: #fff;
+    background: var(--accent);
+  }
+  button:hover { background: var(--accent-hover); }
+  button.secondary { background: #3a3d41; }
+  button.secondary:hover { background: #45494e; }
+  #back-to-problems {
+    font-size: 13px;
+    text-decoration: none;
+    color: var(--text);
+    background: #3a3d41;
+    border-radius: 5px;
+    padding: 7px 14px;
+  }
+  #back-to-problems:hover { background: #45494e; }
+  .hint { color: var(--muted); font-size: 12px; }
+
+  #editor-wrap { flex: 1; position: relative; min-height: 0; }
+  /* #editor hosts the CodeMirror 6 EditorView (see the editor setup in JS). */
+
+  /* Solution tabs (extra-solutions pages) */
+  #tabs {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+    padding: 0 8px;
+    background: var(--panel2);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+  #tabs::-webkit-scrollbar { height: 6px; }
+  #tabs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    max-width: 220px;
+  }
+  .tab:hover { background: var(--bg); color: var(--text); }
+  .tab.active {
+    color: var(--text);
+    background: var(--bg);
+    border-bottom-color: var(--accent-hover);
+  }
+  .tab .tab-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tab .tab-name.solved::before { content: "✓ "; color: var(--green); }
+  .tab .tab-close {
+    font-size: 13px;
+    line-height: 1;
+    color: var(--muted);
+    border-radius: 3px;
+    padding: 0 3px;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  .tab:hover .tab-close,
+  .tab.active .tab-close { opacity: 0.7; }
+  .tab .tab-close:hover { opacity: 1; background: var(--red); color: #fff; }
+  #tab-add {
+    flex-shrink: 0;
+    align-self: center;
+    background: none;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1;
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+  #tab-add:hover { background: var(--bg); color: var(--green); }
+
+  #results {
+    height: 230px;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    overflow-y: auto;
+    padding: 12px 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  #results .summary { margin-bottom: 10px; font-family: inherit; font-size: 13px; }
+  .case {
+    border-left: 3px solid var(--border);
+    padding: 6px 12px;
+    margin-bottom: 6px;
+    background: var(--bg);
+    border-radius: 0 4px 4px 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .case.pass { border-left-color: var(--green); }
+  .case.fail { border-left-color: var(--red); }
+  .case .label { font-weight: bold; }
+  .case .pass-tag { color: var(--green); }
+  .case .fail-tag { color: var(--red); }
+  .case .kv { color: var(--muted); display: block; margin-top: 3px; }
+  .case .kv b { color: var(--text); font-weight: normal; }
+  .err { color: var(--red); white-space: pre-wrap; }
+  .console {
+    margin-top: 6px;
+    padding: 6px 8px;
+    background: #00000033;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+  }
+  .console-label {
+    display: block;
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+  }
+  .console .log-line { display: block; white-space: pre-wrap; word-break: break-word; }
+  .console .log-warn  { color: #d9a441; }
+  .console .log-error { color: var(--red); }
+  .console .log-debug { color: var(--muted); }
+
+  /* ---------- CodeMirror 6 layout ----------
+     Editor chrome + Monokai Pro token colors live in JS (EditorView.theme +
+     HighlightStyle, see the editor setup below). Only sizing lives here. */
+  #editor { height: 100%; }
+  .cm-editor { height: 100%; }
+  .cm-editor .cm-scroller { overflow: auto; }
+
+  /* ---------- Claude AI: explain panel ---------- */
+  button.ai { background: linear-gradient(135deg, #6e56cf, #9b6dff); }
+  button.ai:hover { background: linear-gradient(135deg, #7d68d6, #a87dff); }
+  #key-btn { font-size: 14px; }
+
+  #explain-panel {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 440px;
+    max-width: 88%;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(102%);
+    transition: transform 0.18s ease;
+    z-index: 30;
+  }
+  #explain-panel.open { transform: translateX(0); }
+  #explain-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel2);
+  }
+  #explain-head h3 { margin: 0; font-size: 13px; flex: 1; font-weight: 600; }
+  #explain-head .explain-icon { color: #b69bff; font-size: 14px; }
+  #explain-snippet {
+    margin: 0;
+    padding: 10px 14px;
+    max-height: 150px;
+    overflow: auto;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.5;
+    color: #b9c2ad;
+    white-space: pre;
+  }
+  #explain-snippet:empty { display: none; }
+  #explain-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px;
+    font-size: 13.5px;
+    line-height: 1.65;
+  }
+  .explain-status { color: var(--muted); font-size: 13px; }
+  .explain-status.err { color: var(--red); white-space: pre-wrap; }
+  .explain-md > *:first-child { margin-top: 0; }
+  .explain-md p { margin: 0 0 10px; }
+  .explain-md h3, .explain-md h4, .explain-md h5 { margin: 14px 0 6px; font-size: 14px; color: var(--green); }
+  .explain-md ul { margin: 0 0 10px; padding-left: 20px; }
+  .explain-md li { margin: 3px 0; }
+  .explain-md code {
+    font-family: var(--mono);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12.5px;
+  }
+  .explain-md pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    overflow-x: auto;
+    margin: 0 0 10px;
+  }
+  .explain-md pre code { background: none; border: none; padding: 0; font-size: 12.5px; }
+  .explain-md strong { color: var(--text); font-weight: 600; }
+  .explain-md + .explain-md { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+  /* user's follow-up question bubble */
+  .explain-q {
+    margin: 14px 0 4px auto;
+    max-width: 90%;
+    padding: 7px 11px;
+    background: rgba(110, 86, 207, 0.18);
+    border: 1px solid rgba(155, 109, 255, 0.35);
+    border-radius: 10px 10px 2px 10px;
+    font-size: 13px;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* ask-a-follow-up input row */
+  #explain-ask {
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    background: var(--panel2);
+    flex-shrink: 0;
+  }
+  #explain-ask textarea {
+    flex: 1;
+    resize: none;
+    min-height: 36px;
+    max-height: 120px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    line-height: 1.4;
+  }
+  #explain-ask textarea:focus { outline: none; border-color: #9b6dff; }
+  #explain-ask textarea:disabled { opacity: 0.5; }
+  #explain-ask button {
+    align-self: flex-end;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, #6e56cf, #9b6dff);
+  }
+  #explain-ask button:disabled { opacity: 0.5; cursor: default; }
+</style>
+</head>
+<body>
+  <div id="sidebar">
+    <div id="sidebar-head">
+      <h1>⚡ Personal LeetCode</h1>
+      <button id="collapse-btn" class="icon-btn" title="Collapse sidebar">«</button>
+    </div>
+    <div id="progress"></div>
+    <div id="filter">
+      <input id="filter-search" type="text" spellcheck="false" autocomplete="off"
+             placeholder="Filter problems…" title="Filter by number or title" />
+      <div class="filter-row" id="filter-diff">
+        <button class="filter-chip active" data-diff="all">all</button>
+        <button class="filter-chip" data-diff="easy">easy</button>
+        <button class="filter-chip" data-diff="medium">medium</button>
+        <button class="filter-chip" data-diff="hard">hard</button>
+      </div>
+      <div class="filter-row" id="filter-status">
+        <button class="filter-chip active" data-status="all">all</button>
+        <button class="filter-chip" data-status="todo">todo</button>
+        <button class="filter-chip" data-status="solved">solved</button>
+      </div>
+    </div>
+    <div id="problem-list"></div>
+  </div>
+  <div id="sidebar-resizer" title="Drag to resize the sidebar"></div>
+
+  <div id="description"></div>
+  <div id="desc-resizer" title="Drag to resize the description pane"></div>
+
+  <div id="main">
+    <div id="toolbar">
+      <button id="sidebar-toggle" class="icon-btn" title="Toggle sidebar (problem list)">☰</button>
+      <a id="back-to-problems" href="index.html" title="Back to the weekly problems list">📚 Overview</a>
+      <button id="run-btn">▶ Run (Ctrl+Enter)</button>
+      <button id="reset-btn" class="secondary">Reset</button>
+      <button id="explain-btn" class="ai" title="Explain the selected lines (or whole solution) with Claude — Shift+Ctrl+E">✦ Explain</button>
+      <span class="spacer"></span>
+      <button id="key-btn" class="icon-btn" title="Set Anthropic API key">🔑</button>
+      <span class="hint">Code auto-saves locally</span>
+    </div>
+    <div id="tabs" title="Solution pages — keep multiple approaches per problem"></div>
+    <div id="editor-wrap">
+      <div id="editor"></div>
+      <div id="explain-panel">
+        <div id="explain-head">
+          <span class="explain-icon">✦</span>
+          <h3>Claude explains</h3>
+          <button id="explain-close" class="icon-btn" title="Close (Esc)">✕</button>
+        </div>
+        <pre id="explain-snippet"></pre>
+        <div id="explain-body"><div class="explain-status">Select code and click ✦ Explain.</div></div>
+        <div id="explain-ask">
+          <textarea id="explain-input" rows="1" placeholder="Run ✦ Explain first, then ask a follow-up…" disabled></textarea>
+          <button id="explain-ask-btn" disabled title="Ask Claude (Enter)">Ask</button>
+        </div>
+      </div>
+    </div>
+    <div id="results">
+      <div class="summary hint">Write your solution, then Run.</div>
+    </div>
+  </div>
+
+<script src="problems.js"></script>
+
+<script type="module">
+"use strict";
+
+// ---------- CodeMirror 6 (editor framework) ----------
+import { basicSetup } from "codemirror";
+import { EditorState, Prec } from "@codemirror/state";
+import { EditorView, keymap } from "@codemirror/view";
+import { indentUnit, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { indentWithTab } from "@codemirror/commands";
+import { javascript } from "@codemirror/lang-javascript";
+import { linter, lintGutter } from "@codemirror/lint";
+import { tags as t } from "@lezer/highlight";
+
+// ---------- ESLint (real linter, loaded from a CDN) ----------
+// Loaded optionally: if the CDN is unreachable the editor still works, just
+// without live linting.
+let Linter = null;
+try {
+  ({ Linter } = await import("https://esm.sh/eslint-linter-browserify@latest"));
+} catch (err) {
+  console.warn("ESLint failed to load — linting disabled.", err);
+}
+
+const GLOBAL_NAMES = [
+  // ES built-ins
+  "Array", "ArrayBuffer", "BigInt", "BigInt64Array", "BigUint64Array",
+  "Boolean", "DataView", "Date", "decodeURI", "decodeURIComponent",
+  "encodeURI", "encodeURIComponent", "Error", "escape", "eval", "EvalError",
+  "Float32Array", "Float64Array", "Function", "globalThis", "Infinity",
+  "Int16Array", "Int32Array", "Int8Array", "isFinite", "isNaN", "JSON",
+  "Map", "Math", "NaN", "Number", "Object", "parseFloat", "parseInt",
+  "Promise", "Proxy", "RangeError", "ReferenceError", "Reflect", "RegExp",
+  "Set", "String", "Symbol", "SyntaxError", "TypeError", "Uint16Array",
+  "Uint32Array", "Uint8Array", "Uint8ClampedArray", "undefined", "unescape",
+  "URIError", "WeakMap", "WeakSet", "structuredClone",
+  // newer ECMAScript built-ins (ES2020+)
+  "Atomics", "SharedArrayBuffer", "WeakRef", "FinalizationRegistry",
+  "AggregateError", "Iterator", "Float16Array", "queueMicrotask",
+  // browser conveniences a solution might reach for
+  "console", "setTimeout", "clearTimeout", "setInterval", "clearInterval",
+];
+const GLOBALS = Object.fromEntries(GLOBAL_NAMES.map((n) => [n, "readonly"]));
+
+const ESLINT_CONFIG = {
+  languageOptions: {
+    ecmaVersion: "latest",
+    sourceType: "script",
+    globals: GLOBALS,
+  },
+  rules: {
+    "no-undef": "error",
+    "no-unused-vars": ["warn", { vars: "local", args: "after-used" }],
+    "no-const-assign": "error",
+    "no-redeclare": "error",
+    "no-dupe-keys": "error",
+    "no-dupe-args": "error",
+    "no-unreachable": "warn",
+    "valid-typeof": "error",
+    "use-isnan": "error",
+    "no-cond-assign": ["error", "always"],
+    "no-constant-condition": ["warn", { checkLoops: false }],
+    "no-debugger": "warn",
+  },
+};
+
+const eslint = Linter ? new Linter() : null;
+
+// CM6 linter extension: runs ESLint and maps its 1-based line/column messages
+// onto absolute document offsets (the unit CM6 diagnostics use).
+const esLintExtension = linter((view) => {
+  if (!eslint) return [];
+  let messages;
+  try {
+    messages = eslint.verify(view.state.doc.toString(), ESLINT_CONFIG);
+  } catch (err) {
+    return [];
+  }
+  const doc = view.state.doc;
+  const offsetOf = (lineNo, colNo) => {
+    const ln = Math.min(Math.max(lineNo || 1, 1), doc.lines);
+    const lineObj = doc.line(ln);
+    const col = Math.max((colNo || 1) - 1, 0);
+    return Math.min(lineObj.from + col, lineObj.to);
+  };
+  return messages.map((m) => {
+    const from = offsetOf(m.line, m.column);
+    let to = offsetOf(m.endLine || m.line, m.endColumn || (m.column || 1) + 1);
+    if (to <= from) to = Math.min(from + 1, doc.length);
+    return {
+      from,
+      to,
+      severity: m.severity === 2 ? "error" : "warning",
+      message: m.ruleId ? `${m.message} (${m.ruleId})` : m.message,
+    };
+  });
+}, { delay: 350 });
+
+(function () {
+  const listEl = document.getElementById("problem-list");
+  const descEl = document.getElementById("description");
+  const resultsEl = document.getElementById("results");
+  const runBtn = document.getElementById("run-btn");
+  const resetBtn = document.getElementById("reset-btn");
+  const progressEl = document.getElementById("progress");
+  const collapseBtn = document.getElementById("collapse-btn");
+  const sidebarToggle = document.getElementById("sidebar-toggle");
+  const tabsEl = document.getElementById("tabs");
+  const filterSearch = document.getElementById("filter-search");
+  const filterDiff = document.getElementById("filter-diff");
+  const filterStatus = document.getElementById("filter-status");
+
+  // ---------- CodeMirror 6 editor ----------
+  // Editor chrome (Monokai Pro "Classic" backdrop, gutters, cursor, selection).
+  const monokaiProTheme = EditorView.theme({
+    "&": { color: "#fcfcfa", backgroundColor: "#2d2a2e", fontSize: "14px" },
+    ".cm-content": {
+      fontFamily: "var(--mono)",
+      lineHeight: "1.55",
+      caretColor: "#fcfcfa",
+      /* operators like ===, !== render as discrete glyphs, not ligatures */
+      fontVariantLigatures: "none",
+      fontFeatureSettings: '"liga" 0, "calt" 0',
+    },
+    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "#fcfcfa" },
+    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
+      { backgroundColor: "#423f42" },
+    ".cm-activeLine": { backgroundColor: "rgba(255,255,255,0.035)" },
+    ".cm-gutters": {
+      backgroundColor: "#2d2a2e",
+      color: "#5b595c",
+      border: "none",
+      borderRight: "1px solid var(--border)",
+    },
+    ".cm-activeLineGutter": { backgroundColor: "rgba(255,255,255,0.035)" },
+    ".cm-matchingBracket": { backgroundColor: "transparent", color: "#a9dc76", outline: "1px solid #5b595c" },
+    ".cm-foldPlaceholder": { backgroundColor: "transparent", border: "none", color: "#727072" },
+    /* lint tooltip on a dark background (was .CodeMirror-lint-tooltip) */
+    ".cm-tooltip": {
+      backgroundColor: "var(--panel2)",
+      color: "var(--text)",
+      border: "1px solid var(--border)",
+      borderRadius: "4px",
+      fontFamily: "var(--mono)",
+      fontSize: "12px",
+    },
+  }, { dark: true });
+
+  // Monokai Pro token colors. CM6's Lezer JS grammar tags a function's *name*
+  // (function(definition(variableName))) separately from its parameters
+  // (definition(variableName)) — so they finally get different colors.
+  const monokaiProHighlight = HighlightStyle.define([
+    { tag: [t.keyword, t.operatorKeyword, t.controlKeyword, t.moduleKeyword,
+            t.definitionKeyword, t.modifier, t.operator, t.self], color: "#ff6188" },
+    { tag: [t.number, t.bool, t.atom, t.null, t.escape], color: "#ab9df2" },
+    { tag: [t.string, t.special(t.string), t.regexp], color: "#ffd866" },
+    { tag: [t.function(t.variableName), t.function(t.definition(t.variableName)),
+            t.function(t.propertyName), t.macroName, t.labelName], color: "#a9dc76" },
+    // Monokai Pro paints parameters orange italic. CM6 tags params as
+    // definition(variableName) — which also covers let/const names, so those
+    // pick up the same orange (CM6's grammar can't separate the two).
+    { tag: t.definition(t.variableName), color: "#fc9867", fontStyle: "italic" },
+    { tag: [t.variableName, t.propertyName, t.attributeName], color: "#fcfcfa" },
+    { tag: [t.typeName, t.className, t.namespace, t.tagName], color: "#78dce8", fontStyle: "italic" },
+    { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: "#727072", fontStyle: "italic" },
+    { tag: [t.meta], color: "#fcfcfa" },
+    { tag: [t.bracket, t.squareBracket, t.paren, t.brace, t.punctuation,
+            t.separator, t.derefOperator], color: "#fcfcfa" },
+    { tag: [t.invalid], color: "#ff6188" },
+  ]);
+
+  const changeHandlers = [];
+  const view = new EditorView({
+    parent: document.getElementById("editor"),
+    state: EditorState.create({
+      doc: "",
+      extensions: [
+        basicSetup,
+        javascript(),
+        indentUnit.of("  "),
+        EditorState.tabSize.of(2),
+        monokaiProTheme,
+        Prec.highest(syntaxHighlighting(monokaiProHighlight)),
+        eslint ? [esLintExtension, lintGutter()] : [],
+        Prec.highest(keymap.of([
+          { key: "Mod-Enter", preventDefault: true, run: () => { run(); return true; } },
+          { key: "Shift-Mod-e", preventDefault: true, run: () => { explain(); return true; } },
+          indentWithTab,
+        ])),
+        EditorView.updateListener.of((u) => {
+          if (u.docChanged) changeHandlers.forEach((fn) => fn());
+        }),
+      ],
+    }),
+  });
+
+  // Adapter: exposes the CM5 method surface the rest of the app already calls,
+  // backed by the CM6 EditorView.
+  const cm = {
+    getValue: () => view.state.doc.toString(),
+    setValue: (text) => view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: text ?? "" },
+    }),
+    getSelection: () => {
+      const { from, to } = view.state.selection.main;
+      return view.state.sliceDoc(from, to);
+    },
+    focus: () => view.focus(),
+    refresh: () => {},   // CM6 re-measures automatically; kept for call sites
+    on: (event, fn) => { if (event === "change") changeHandlers.push(fn); },
+  };
+
+  let currentId = null;
+  let currentPid = null;            // active solution page for the current problem
+  const STORE_PREFIX = "plc:code:";
+  const SOLVED_PREFIX = "plc:solved:";
+  const NOTES_PREFIX = "plc:notes:";
+  const PAGES_PREFIX = "plc:pages:";   // JSON: [{ pid, name }]
+  const ACTIVE_PREFIX = "plc:page:";   // pid of the active page per problem
+
+  // ---------- persistence ----------
+  const isSolved = (id) => localStorage.getItem(SOLVED_PREFIX + id) === "1";
+  const setSolved = (id, v) => localStorage.setItem(SOLVED_PREFIX + id, v ? "1" : "0");
+  const savedNotes = (id) => localStorage.getItem(NOTES_PREFIX + id) || "";
+  const saveNotes = (id, text) => localStorage.setItem(NOTES_PREFIX + id, text);
+
+  // ---------- problem-list filters ----------
+  // Persisted search text + difficulty/status chip selection. Applied in
+  // renderList so the sidebar only shows matching problems.
+  const FILTER_KEY = "plc:filters";
+  const filters = (() => {
+    try {
+      const f = JSON.parse(localStorage.getItem(FILTER_KEY) || "null");
+      if (f && typeof f === "object")
+        return { q: f.q || "", diff: f.diff || "all", status: f.status || "all" };
+    } catch { /* fall through to defaults */ }
+    return { q: "", diff: "all", status: "all" };
+  })();
+  const saveFilters = () =>
+    localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
+
+  function matchesFilter(p) {
+    if (filters.diff !== "all" && p.difficulty !== filters.diff) return false;
+    if (filters.status !== "all") {
+      const solved = isSolved(p.id);
+      if (filters.status === "solved" && !solved) return false;
+      if (filters.status === "todo" && solved) return false;
+    }
+    const q = filters.q.trim().toLowerCase();
+    if (q && !`${p.num}. ${p.title}`.toLowerCase().includes(q)) return false;
+    return true;
+  }
+
+  // ---------- solution pages (extra solutions) ----------
+  // Each problem owns a list of pages. A page's code lives at
+  // `plc:code:<id>:<pid>`, except the original page (pid "main") which keeps the
+  // legacy `plc:code:<id>` key so previously-saved solutions survive the upgrade.
+  const codeKey = (id, pid) =>
+    pid === "main" ? STORE_PREFIX + id : `${STORE_PREFIX}${id}:${pid}`;
+  const savedCode = (id, pid) => localStorage.getItem(codeKey(id, pid));
+  const saveCode = (id, pid, code) => localStorage.setItem(codeKey(id, pid), code);
+
+  function getPages(id) {
+    let pages;
+    try { pages = JSON.parse(localStorage.getItem(PAGES_PREFIX + id) || "null"); }
+    catch { pages = null; }
+    if (!Array.isArray(pages) || pages.length === 0) {
+      // First visit (or fresh upgrade): seed one page, adopting any legacy code.
+      pages = [{ pid: "main", name: "Solution 1" }];
+      setPages(id, pages);
+    }
+    return pages;
+  }
+  const setPages = (id, pages) =>
+    localStorage.setItem(PAGES_PREFIX + id, JSON.stringify(pages));
+
+  function getActivePid(id) {
+    const pages = getPages(id);
+    const pid = localStorage.getItem(ACTIVE_PREFIX + id);
+    return pages.some((p) => p.pid === pid) ? pid : pages[0].pid;
+  }
+  const setActivePid = (id, pid) => localStorage.setItem(ACTIVE_PREFIX + id, pid);
+
+  // Persist whatever is currently in the editor to the active page.
+  function saveCurrent() {
+    if (currentId && currentPid != null) saveCode(currentId, currentPid, cm.getValue());
+  }
+
+  // ---------- sidebar ----------
+  function renderProgress() {
+    const total = PROBLEMS.length;
+    const done = PROBLEMS.filter((p) => isSolved(p.id)).length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    progressEl.innerHTML =
+      `<div class="bar"><div class="fill" style="width:${pct}%"></div></div>` +
+      `<div class="label"><b>✓ ${done}</b> of ${total} completed</div>`;
+  }
+
+  function renderList() {
+    listEl.innerHTML = "";
+    const shown = PROBLEMS.filter(matchesFilter);
+    for (const p of shown) {
+      const item = document.createElement("div");
+      item.className = "problem-item" + (p.id === currentId ? " active" : "");
+      const solved = isSolved(p.id);
+      item.innerHTML =
+        `<span class="status ${solved ? "solved" : ""}">${solved ? "✓" : ""}</span>` +
+        `<span>${p.num}. ${escapeHtml(p.title)}</span>` +
+        `<span class="difficulty diff-${p.difficulty}">${p.difficulty}</span>`;
+      item.onclick = () => selectProblem(p.id);
+      listEl.appendChild(item);
+    }
+    if (!shown.length) {
+      const empty = document.createElement("div");
+      empty.id = "problem-empty";
+      empty.textContent = "No problems match your filters.";
+      listEl.appendChild(empty);
+    }
+    renderProgress();
+  }
+
+  // Reflect the current filter state onto the inputs/chips.
+  function syncFilterUI() {
+    filterSearch.value = filters.q;
+    filterDiff.querySelectorAll(".filter-chip").forEach((b) =>
+      b.classList.toggle("active", b.dataset.diff === filters.diff));
+    filterStatus.querySelectorAll(".filter-chip").forEach((b) =>
+      b.classList.toggle("active", b.dataset.status === filters.status));
+  }
+
+  function selectProblem(id) {
+    saveCurrent();
+    // Abort any in-flight reply and stash the outgoing problem's chat, then
+    // bring up the incoming problem's own thread.
+    if (explainAbort) { explainAbort.abort(); turnGen++; }
+    // Drop an unanswered in-flight user turn so the saved thread stays well-formed.
+    if (conversation.length && conversation[conversation.length - 1].role === "user")
+      conversation.pop();
+    persistChat(currentId);
+    setBusy(false);
+    currentId = id;
+    currentPid = getActivePid(id);
+    restoreChat(id);
+    const p = PROBLEMS.find((x) => x.id === id);
+    const cx = p.complexity
+      ? `<div class="complexity">` +
+        `<span class="cx-label">Optimal</span>` +
+        `<span class="cx-item">Time <b>${escapeHtml(p.complexity.time)}</b></span>` +
+        `<span class="cx-item">Space <b>${escapeHtml(p.complexity.space)}</b></span>` +
+        `</div>`
+      : "";
+    descEl.innerHTML =
+      `<h2>${p.num}. ${escapeHtml(p.title)} ` +
+      `<span class="difficulty diff-${p.difficulty}">${p.difficulty}</span></h2>` +
+      cx +
+      p.description +
+      `<div id="notes-section">` +
+      `<div class="notes-head"><h3>📝 My notes</h3><span id="notes-saved">saved</span></div>` +
+      `<textarea id="notes-area" spellcheck="false" ` +
+      `placeholder="Approach, pattern, gotchas, what tripped you up, complexity…"></textarea>` +
+      `</div>`;
+    wireNotes(id);
+    cm.setValue(savedCode(id, currentPid) ?? p.starter);
+    resultsEl.innerHTML = '<div class="summary hint">Write your solution, then Run.</div>';
+    renderTabs();
+    renderList();
+    cm.focus();
+    // Keep the URL in sync so a problem is shareable/deep-linkable (e.g. index.html#two-sum).
+    if (location.hash.slice(1) !== id) history.replaceState(null, "", "#" + id);
+  }
+
+  // ---------- solution tabs ----------
+  const isPageSolved = (id, pid) =>
+    localStorage.getItem(SOLVED_PREFIX + id + ":" + pid) === "1";
+  const setPageSolved = (id, pid, v) =>
+    localStorage.setItem(SOLVED_PREFIX + id + ":" + pid, v ? "1" : "0");
+
+  function renderTabs() {
+    if (!currentId) return;
+    const pages = getPages(currentId);
+    tabsEl.innerHTML = "";
+    pages.forEach((page) => {
+      const tab = document.createElement("button");
+      tab.className = "tab" + (page.pid === currentPid ? " active" : "");
+      tab.title = page.name + " — click to switch, double-click to rename";
+
+      const name = document.createElement("span");
+      name.className = "tab-name" + (isPageSolved(currentId, page.pid) ? " solved" : "");
+      name.textContent = page.name;
+      tab.appendChild(name);
+
+      // The last remaining page can't be closed — every problem keeps ≥1 page.
+      if (pages.length > 1) {
+        const close = document.createElement("span");
+        close.className = "tab-close";
+        close.textContent = "✕";
+        close.title = "Delete this solution page";
+        close.onclick = (e) => { e.stopPropagation(); deletePage(page.pid); };
+        tab.appendChild(close);
+      }
+
+      tab.onclick = () => selectPage(page.pid);
+      tab.ondblclick = () => renamePage(page.pid);
+      tabsEl.appendChild(tab);
+    });
+
+    const add = document.createElement("button");
+    add.id = "tab-add";
+    add.textContent = "+";
+    add.title = "Add another solution page";
+    add.onclick = addPage;
+    tabsEl.appendChild(add);
+  }
+
+  function selectPage(pid) {
+    if (pid === currentPid) return;
+    saveCurrent();
+    currentPid = pid;
+    setActivePid(currentId, pid);
+    const p = PROBLEMS.find((x) => x.id === currentId);
+    cm.setValue(savedCode(currentId, pid) ?? p.starter);
+    resultsEl.innerHTML = '<div class="summary hint">Write your solution, then Run.</div>';
+    renderTabs();
+    cm.focus();
+  }
+
+  function addPage() {
+    saveCurrent();
+    const pages = getPages(currentId);
+    const pid = "p" + Date.now().toString(36);
+    const name = (prompt("Name this solution page:", `Solution ${pages.length + 1}`) || "").trim()
+      || `Solution ${pages.length + 1}`;
+    pages.push({ pid, name });
+    setPages(currentId, pages);
+    const p = PROBLEMS.find((x) => x.id === currentId);
+    saveCode(currentId, pid, p.starter);   // seed with starter so Run/Explain work immediately
+    currentPid = pid;
+    setActivePid(currentId, pid);
+    cm.setValue(p.starter);
+    resultsEl.innerHTML = '<div class="summary hint">Write your solution, then Run.</div>';
+    renderTabs();
+    cm.focus();
+  }
+
+  function renamePage(pid) {
+    const pages = getPages(currentId);
+    const page = pages.find((x) => x.pid === pid);
+    if (!page) return;
+    const name = prompt("Rename solution page:", page.name);
+    if (name === null) return;
+    page.name = name.trim() || page.name;
+    setPages(currentId, pages);
+    renderTabs();
+  }
+
+  function deletePage(pid) {
+    const pages = getPages(currentId);
+    if (pages.length <= 1) return;
+    const page = pages.find((x) => x.pid === pid);
+    if (!confirm(`Delete "${page ? page.name : "this page"}"? Its code will be lost.`)) return;
+    const idx = pages.findIndex((x) => x.pid === pid);
+    pages.splice(idx, 1);
+    setPages(currentId, pages);
+    localStorage.removeItem(codeKey(currentId, pid));
+    localStorage.removeItem(SOLVED_PREFIX + currentId + ":" + pid);
+    if (currentPid === pid) {
+      // Fall back to the neighbouring page.
+      currentPid = pages[Math.max(0, idx - 1)].pid;
+      setActivePid(currentId, currentPid);
+      const p = PROBLEMS.find((x) => x.id === currentId);
+      cm.setValue(savedCode(currentId, currentPid) ?? p.starter);
+    }
+    renderTabs();
+    cm.focus();
+  }
+
+  // ---------- per-problem notes ----------
+  // The textarea is recreated with the description on every problem switch, so
+  // (re)load its saved value and attach a debounced autosave each time.
+  function wireNotes(id) {
+    const ta = document.getElementById("notes-area");
+    const savedTag = document.getElementById("notes-saved");
+    if (!ta) return;
+    ta.value = savedNotes(id);
+    let t;
+    ta.addEventListener("input", () => {
+      saveNotes(id, ta.value);
+      if (savedTag) {
+        savedTag.classList.add("show");
+        clearTimeout(t);
+        t = setTimeout(() => savedTag.classList.remove("show"), 900);
+      }
+    });
+  }
+
+  // ---------- run / test ----------
+  function deepEqual(a, b) {
+    if (a === b) return true;
+    if (typeof a !== typeof b) return false;
+    if (a && b && typeof a === "object") {
+      if (Array.isArray(a) !== Array.isArray(b)) return false;
+      const ka = Object.keys(a), kb = Object.keys(b);
+      if (ka.length !== kb.length) return false;
+      return ka.every((k) => deepEqual(a[k], b[k]));
+    }
+    return false;
+  }
+
+  // For "order doesn't matter" problems: recursively sort arrays before comparing.
+  function normalizeDeep(x) {
+    if (Array.isArray(x)) {
+      const arr = x.map(normalizeDeep);
+      arr.sort((a, b) => (JSON.stringify(a) < JSON.stringify(b) ? -1 : 1));
+      return arr;
+    }
+    return x;
+  }
+
+  function fmt(v) {
+    try { return JSON.stringify(v); } catch { return String(v); }
+  }
+
+  // Run user code in a Web Worker with a timeout, so infinite loops can't hang the page.
+  function runInWorker(userCode, fnName, cases, io, timeoutMs = 3000) {
+    return new Promise((resolve) => {
+      const workerSrc = `
+        // Capture console output so it can be surfaced in the results panel.
+        var __logs = [];
+        function __fmtArg(a) {
+          if (typeof a === "string") return a;
+          try { return JSON.stringify(a); } catch (e) { return String(a); }
+        }
+        ["log", "info", "warn", "error", "debug"].forEach(function (level) {
+          console[level] = function () {
+            __logs.push({ level: level, text: Array.prototype.map.call(arguments, __fmtArg).join(" ") });
+          };
+        });
+
+        // LeetCode-style node types, exposed globally so user code can use them directly.
+        self.ListNode = function ListNode(val, next) { this.val = val === undefined ? 0 : val; this.next = next === undefined ? null : next; };
+        self.TreeNode = function TreeNode(val, left, right) { this.val = val === undefined ? 0 : val; this.left = left === undefined ? null : left; this.right = right === undefined ? null : right; };
+        self.Node = function Node(val, neighbors) { this.val = val === undefined ? 0 : val; this.neighbors = neighbors === undefined ? [] : neighbors; };
+
+        // Bridges between the JSON test cases and the real structures the solution sees.
+        function __buildList(vals) { var dummy = { next: null }, cur = dummy; for (var i = 0; i < vals.length; i++) { cur.next = new self.ListNode(vals[i]); cur = cur.next; } return dummy.next; }
+        function __buildListCycle(vals, pos) { var dummy = { next: null }, cur = dummy, nodes = []; for (var i = 0; i < vals.length; i++) { cur.next = new self.ListNode(vals[i]); cur = cur.next; nodes.push(cur); } if (pos >= 0 && pos < nodes.length) nodes[nodes.length - 1].next = nodes[pos]; return dummy.next; }
+        function __listToArr(node) { var out = [], seen = new Set(); while (node && !seen.has(node)) { seen.add(node); out.push(node.val); node = node.next; } return out; }
+        function __buildTree(arr) { if (!arr.length || arr[0] == null) return null; var root = new self.TreeNode(arr[0]), q = [root], i = 1; while (i < arr.length) { var n = q.shift(); if (i < arr.length) { var lv = arr[i++]; if (lv != null) { n.left = new self.TreeNode(lv); q.push(n.left); } } if (i < arr.length) { var rv = arr[i++]; if (rv != null) { n.right = new self.TreeNode(rv); q.push(n.right); } } } return root; }
+        function __buildGraph(adj) { if (!adj.length) return null; var nodes = adj.map(function (_, i) { return new self.Node(i + 1); }); adj.forEach(function (nbrs, i) { nodes[i].neighbors = nbrs.map(function (j) { return nodes[j - 1]; }); }); return nodes[0]; }
+        function __graphToAdj(node) { if (!node) return []; var map = new Map(), stack = [node]; map.set(node.val, node); while (stack.length) { var n = stack.pop(); for (var k = 0; k < n.neighbors.length; k++) { var nb = n.neighbors[k]; if (!map.has(nb.val)) { map.set(nb.val, nb); stack.push(nb); } } } var maxVal = 0; map.forEach(function (_, v) { if (v > maxVal) maxVal = v; }); var res = []; for (var v = 1; v <= maxVal; v++) { var nd = map.get(v); res.push(nd ? nd.neighbors.map(function (x) { return x.val; }) : []); } return res; }
+
+        self.onmessage = function (e) {
+          const { userCode, fnName, cases, io } = e.data;
+          const results = [];
+          let fn;
+          try {
+            fn = (0, eval)(userCode + "\\n;" + fnName + ";");
+          } catch (err) {
+            self.postMessage({ fatal: "Could not load your code: " + (err && err.message || err), logs: __logs });
+            return;
+          }
+          if (typeof fn !== "function") {
+            self.postMessage({ fatal: "No function or class named '" + fnName + "' was found. Define and (implicitly) leave it in scope.", logs: __logs });
+            return;
+          }
+          for (const c of cases) {
+            __logs = [];
+            // Design problems: replay a sequence of [method, ...args] calls against one instance.
+            if (io === "class") {
+              const calls = JSON.parse(JSON.stringify(c.calls));
+              const got = [];
+              let inst = null;
+              try {
+                for (const call of calls) {
+                  const method = call[0], cargs = call.slice(1);
+                  if (method === fnName) { inst = new fn(...cargs); got.push(null); }
+                  else { const r = inst[method](...cargs); got.push(r === undefined ? null : r); }
+                }
+                results.push({ args: c.calls, expected: c.expected, got: got, error: null, logs: __logs });
+              } catch (err) {
+                results.push({ args: c.calls, expected: c.expected, got: got, error: (err && err.message) || String(err), logs: __logs });
+              }
+              continue;
+            }
+            try {
+              let args = JSON.parse(JSON.stringify(c.args));
+              if (io === "linkedlist") args = [__buildList(args[0])];
+              else if (io === "linkedlist-cycle") args = [__buildListCycle(args[0], args[1])];
+              else if (io === "tree") args = [__buildTree(args[0])].concat(args.slice(1));
+              else if (io === "graph") args = [__buildGraph(args[0])];
+              let out = fn.apply(null, args);
+              if (io === "linkedlist") out = __listToArr(out);
+              else if (io === "graph") out = __graphToAdj(out);
+              results.push({ args: c.args, expected: c.expected, got: out, error: null, logs: __logs });
+            } catch (err) {
+              results.push({ args: c.args, expected: c.expected, got: undefined, error: (err && err.message) || String(err), logs: __logs });
+            }
+          }
+          self.postMessage({ results });
+        };
+      `;
+      const blob = new Blob([workerSrc], { type: "application/javascript" });
+      const url = URL.createObjectURL(blob);
+      const worker = new Worker(url);
+      const timer = setTimeout(() => {
+        worker.terminate();
+        URL.revokeObjectURL(url);
+        resolve({ fatal: `Timed out after ${timeoutMs}ms — likely an infinite loop.` });
+      }, timeoutMs);
+      worker.onmessage = (e) => {
+        clearTimeout(timer);
+        worker.terminate();
+        URL.revokeObjectURL(url);
+        resolve(e.data);
+      };
+      worker.onerror = (e) => {
+        clearTimeout(timer);
+        worker.terminate();
+        URL.revokeObjectURL(url);
+        resolve({ fatal: e.message || "Worker error" });
+      };
+      worker.postMessage({ userCode, fnName, cases, io });
+    });
+  }
+
+  // Render captured console output (if any) as a small console block.
+  function renderLogs(logs) {
+    if (!logs || !logs.length) return "";
+    const lines = logs
+      .map((l) => `<span class="log-line log-${escapeHtml(l.level)}">${escapeHtml(l.text)}</span>`)
+      .join("");
+    return `<div class="console"><span class="console-label">console</span>${lines}</div>`;
+  }
+
+  async function run() {
+    const p = PROBLEMS.find((x) => x.id === currentId);
+    saveCurrent();
+    resultsEl.innerHTML = '<div class="summary hint">Running…</div>';
+
+    const data = await runInWorker(cm.getValue(), p.fnName, p.cases, p.io);
+
+    if (data.fatal) {
+      resultsEl.innerHTML = `<div class="summary"><span class="fail-tag">✗ Error</span></div><div class="err">${escapeHtml(data.fatal)}</div>` + renderLogs(data.logs);
+      return;
+    }
+
+    const eq = p.unordered
+      ? (g, e) => deepEqual(normalizeDeep(g), normalizeDeep(e))
+      : deepEqual;
+
+    let passed = 0;
+    const rows = data.results.map((r, i) => {
+      const ok = r.error == null && eq(r.got, r.expected);
+      if (ok) passed++;
+      const got = r.error ? `⚠ ${r.error}` : fmt(r.got);
+      return (
+        `<div class="case ${ok ? "pass" : "fail"}">` +
+        `<span class="label">Case ${i + 1}</span> ` +
+        `<span class="${ok ? "pass-tag" : "fail-tag"}">${ok ? "✓ pass" : "✗ fail"}</span>` +
+        `<span class="kv">Input:    <b>${escapeHtml(fmt(r.args).slice(1, -1))}</b></span>` +
+        `<span class="kv">Expected: <b>${escapeHtml(fmt(r.expected))}</b></span>` +
+        `<span class="kv">Got:      <b>${escapeHtml(got)}</b></span>` +
+        renderLogs(r.logs) +
+        `</div>`
+      );
+    });
+
+    const all = passed === data.results.length;
+    setPageSolved(currentId, currentPid, all);
+    // A problem counts as solved if any of its solution pages passes.
+    const anySolved = getPages(currentId).some((pg) => isPageSolved(currentId, pg.pid));
+    setSolved(currentId, anySolved);
+    renderTabs();
+    renderList();
+
+    resultsEl.innerHTML =
+      `<div class="summary"><span class="${all ? "pass-tag" : "fail-tag"}">` +
+      `${all ? "✓ All tests passed!" : "✗ Some tests failed"}</span> ` +
+      `— ${passed}/${data.results.length} cases</div>` +
+      rows.join("");
+  }
+
+  function reset() {
+    const p = PROBLEMS.find((x) => x.id === currentId);
+    if (!confirm("Reset this page to starter code? Its current code will be lost.")) return;
+    cm.setValue(p.starter);
+    saveCode(currentId, currentPid, p.starter);
+    cm.focus();
+  }
+
+  // ---------- editor niceties ----------
+  // Tab / Ctrl-Enter are handled by CodeMirror's extraKeys above.
+  cm.on("change", () => saveCurrent());
+
+  runBtn.onclick = run;
+  resetBtn.onclick = reset;
+
+  // ---------- Claude AI: explain selected code ----------
+  const KEY_STORE = "plc:anthropic-key";
+  const CLAUDE_MODEL = "claude-sonnet-4-6";
+  const explainBtn = document.getElementById("explain-btn");
+  const keyBtn = document.getElementById("key-btn");
+  const explainPanel = document.getElementById("explain-panel");
+  const explainBody = document.getElementById("explain-body");
+  const explainSnippet = document.getElementById("explain-snippet");
+  const explainClose = document.getElementById("explain-close");
+  const askInput = document.getElementById("explain-input");
+  const askBtn = document.getElementById("explain-ask-btn");
+  let explainAbort = null;
+  let conversation = [];   // running message history sent to Claude
+  let explainSystem = "";  // system prompt, set when a session starts
+  let pendingContext = ""; // problem context to prepend to the next user turn
+  let turnGen = 0;         // guards UI state against superseded turns
+  let busy = false;
+  const chats = {};        // per-problem chat threads, keyed by problem id
+
+  // Snapshot the current problem's thread so it can be restored later.
+  function persistChat(id) {
+    id = id || currentId;
+    if (!id) return;
+    chats[id] = {
+      conversation,
+      system: explainSystem,
+      pending: pendingContext,
+      html: explainBody.innerHTML,
+    };
+  }
+
+  // Swap the panel over to a problem's saved thread (or a fresh, empty one).
+  function restoreChat(id) {
+    const c = chats[id];
+    if (c) {
+      conversation = c.conversation;
+      explainSystem = c.system;
+      pendingContext = c.pending;
+      explainBody.innerHTML = c.html;
+    } else {
+      conversation = [];
+      explainSystem = "";
+      pendingContext = "";
+      explainBody.innerHTML =
+        '<div class="explain-status">Select code and click ✦ Explain.</div>';
+    }
+    explainSnippet.textContent = "";
+    askInput.value = "";
+    askInput.style.height = "";
+    const canAsk = !!pendingContext || conversation.some((m) => m.role === "assistant");
+    askInput.disabled = !canAsk;
+    askBtn.disabled = !canAsk;
+  }
+
+  const getApiKey = () => localStorage.getItem(KEY_STORE) || "";
+  function setApiKey() {
+    const v = prompt(
+      "Enter your Anthropic API key (sk-ant-…).\n" +
+        "Stored only in this browser's localStorage and sent directly to api.anthropic.com.",
+      getApiKey()
+    );
+    if (v === null) return false; // cancelled
+    const k = v.trim();
+    if (k) localStorage.setItem(KEY_STORE, k);
+    else localStorage.removeItem(KEY_STORE);
+    return !!k;
+  }
+
+  // --- minimal markdown → HTML (escape first, then format) ---
+  const mdEsc = (s) =>
+    s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const fmtSpans = (s) =>
+    mdEsc(s)
+      .replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`)
+      .replace(/\*\*([^*]+)\*\*/g, (_, b) => `<strong>${b}</strong>`);
+  function renderMarkdown(src) {
+    let html = "";
+    src.split("```").forEach((part, i) => {
+      if (i % 2 === 1) {
+        // fenced code block — drop an optional leading language line
+        let body = part;
+        const nl = body.indexOf("\n");
+        if (nl !== -1 && /^[a-z0-9+\-]*$/i.test(body.slice(0, nl).trim()))
+          body = body.slice(nl + 1);
+        html += `<pre><code>${mdEsc(body.replace(/\n$/, ""))}</code></pre>`;
+        return;
+      }
+      let inList = false;
+      for (const line of part.split("\n")) {
+        if (/^\s*[-*]\s+/.test(line)) {
+          if (!inList) { html += "<ul>"; inList = true; }
+          html += "<li>" + fmtSpans(line.replace(/^\s*[-*]\s+/, "")) + "</li>";
+          continue;
+        }
+        if (inList) { html += "</ul>"; inList = false; }
+        const h = line.match(/^(#{1,5})\s+(.*)$/);
+        if (h) {
+          const lvl = Math.min(h[1].length + 2, 5);
+          html += `<h${lvl}>` + fmtSpans(h[2]) + `</h${lvl}>`;
+          continue;
+        }
+        if (line.trim() === "") continue;
+        html += "<p>" + fmtSpans(line) + "</p>";
+      }
+      if (inList) html += "</ul>";
+    });
+    return html;
+  }
+
+  function openExplainPanel(snippet) {
+    explainSnippet.textContent =
+      snippet.length > 1500 ? snippet.slice(0, 1500) + "\n…" : snippet;
+    explainPanel.classList.add("open");
+    cm.refresh();
+  }
+  function closeExplainPanel() {
+    explainPanel.classList.remove("open");
+    if (explainAbort) explainAbort.abort();
+  }
+
+  function setBusy(b) {
+    busy = b;
+    explainBtn.disabled = b;
+    askBtn.disabled = b;
+    askInput.disabled = b;
+  }
+
+  // Streams one assistant reply for the current `conversation` into a fresh
+  // bubble. The trailing user message must already be pushed onto `conversation`.
+  async function runTurn() {
+    const myGen = ++turnGen;
+    if (explainAbort) explainAbort.abort();
+    explainAbort = new AbortController();
+
+    const md = document.createElement("div");
+    md.className = "explain-md";
+    md.innerHTML = '<div class="explain-status">Asking Claude…</div>';
+    explainBody.appendChild(md);
+    explainBody.scrollTop = explainBody.scrollHeight;
+    setBusy(true);
+
+    let acc = "";
+    try {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        signal: explainAbort.signal,
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": getApiKey(),
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: CLAUDE_MODEL,
+          max_tokens: 2048,
+          stream: true,
+          system: explainSystem,
+          messages: conversation,
+        }),
+      });
+
+      if (!resp.ok || !resp.body) {
+        let msg = `Request failed (HTTP ${resp.status}).`;
+        try { const e = await resp.json(); if (e.error?.message) msg = e.error.message; } catch {}
+        md.innerHTML =
+          `<div class="explain-status err">${escapeHtml(msg)}</div>` +
+          (resp.status === 401
+            ? '<div class="explain-status">Update your API key with the 🔑 button.</div>'
+            : "");
+        conversation.pop(); // drop the unanswered user turn
+        return;
+      }
+
+      md.innerHTML = "";
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let nl;
+        // SSE events are separated by a blank line
+        while ((nl = buf.indexOf("\n\n")) !== -1) {
+          const evtBlock = buf.slice(0, nl);
+          buf = buf.slice(nl + 2);
+          for (const line of evtBlock.split("\n")) {
+            const t = line.trim();
+            if (!t.startsWith("data:")) continue;
+            const payload = t.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+            let ev;
+            try { ev = JSON.parse(payload); } catch { continue; }
+            if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
+              acc += ev.delta.text;
+              md.innerHTML = renderMarkdown(acc);
+              explainBody.scrollTop = explainBody.scrollHeight;
+            } else if (ev.type === "error") {
+              md.insertAdjacentHTML(
+                "beforeend",
+                `<div class="explain-status err">${escapeHtml(ev.error?.message || "stream error")}</div>`
+              );
+            }
+          }
+        }
+      }
+      if (!acc.trim()) {
+        md.innerHTML = '<div class="explain-status">Claude returned an empty response.</div>';
+        conversation.pop();
+        return;
+      }
+      conversation.push({ role: "assistant", content: acc });
+      pendingContext = ""; // context is now baked into the answered turn
+    } catch (err) {
+      if (err.name === "AbortError") { md.remove(); return; } // superseded or panel closed
+      md.innerHTML = `<div class="explain-status err">${escapeHtml(err.message || String(err))}</div>`;
+      conversation.pop();
+    } finally {
+      if (myGen === turnGen) {
+        setBusy(false);
+        // Keep the box live once there's an answer, or while a code-free
+        // session is still waiting for the user's first question.
+        const ready = !!pendingContext || conversation.some((m) => m.role === "assistant");
+        askInput.disabled = !ready;
+        askBtn.disabled = !ready;
+        if (ready) askInput.focus();
+      }
+    }
+  }
+
+  // The thread body starts with a placeholder status; clear it on first use.
+  function clearPlaceholderIfEmpty() {
+    if (!conversation.length && !explainBody.querySelector(".explain-md, .explain-q"))
+      explainBody.innerHTML = "";
+  }
+
+  async function explain() {
+    if (!getApiKey() && !setApiKey()) return;
+    const sid = currentId;
+    const selection = cm.getSelection();
+    const full = cm.getValue();
+    const p = PROBLEMS.find((x) => x.id === currentId);
+
+    explainPanel.classList.add("open");
+    cm.refresh();
+
+    // Set up the tutor persona once for this problem's session.
+    if (!explainSystem)
+      explainSystem =
+        "You are a sharp, friendly coding tutor for someone practicing LeetCode-style problems in JavaScript. " +
+        "Explain code clearly and concisely using markdown — short paragraphs and bullet points. " +
+        "Cover what the code does and the core idea; mention time/space complexity or a bug only when relevant. " +
+        "Don't restate the whole problem back. The user may ask follow-up questions — answer them in the context of this solution.";
+
+    const title = p ? `${p.num}. ${p.title} (${p.difficulty})` : "a coding problem";
+    const starter = p ? p.starter.trim() : "";
+    const hasCode = !!full.trim() && full.trim() !== starter;
+
+    // No real solution yet: don't auto-answer. Stash context and let the user
+    // type the question they actually want answered first.
+    if (!hasCode) {
+      explainSnippet.textContent = "";
+      // Only stash fresh context when the thread hasn't already got it.
+      if (!conversation.some((m) => m.role === "assistant")) {
+        pendingContext =
+          `Problem: ${title}\n\n` +
+          (full.trim()
+            ? `My code so far:\n\`\`\`js\n${full}\n\`\`\`\n\n`
+            : `I haven't written any code yet.\n\n`);
+        if (!conversation.length)
+          explainBody.innerHTML =
+            '<div class="explain-status">No code yet — ask Claude anything about this problem below.</div>';
+      }
+      askInput.disabled = false;
+      askBtn.disabled = false;
+      askInput.focus();
+      persistChat(sid);
+      return;
+    }
+
+    const snippet = selection.trim() || full;
+    openExplainPanel(snippet);
+    clearPlaceholderIfEmpty();
+
+    let userText = `Problem: ${title}\n\nMy full solution:\n\`\`\`js\n${full}\n\`\`\`\n\n`;
+    userText += selection.trim()
+      ? `Explain these selected lines from my solution:\n\`\`\`js\n${selection}\n\`\`\``
+      : `Walk me through how my whole solution works.`;
+
+    // Show a short bubble for the request so the persisted thread reads naturally.
+    const bubble = document.createElement("div");
+    bubble.className = "explain-q";
+    bubble.textContent = selection.trim()
+      ? "Explain the selected lines"
+      : "Walk me through my solution";
+    explainBody.appendChild(bubble);
+    explainBody.scrollTop = explainBody.scrollHeight;
+
+    pendingContext = "";
+    conversation.push({ role: "user", content: userText });
+    await runTurn();
+    if (currentId === sid) persistChat(sid);
+  }
+
+  async function askFollowUp() {
+    const q = askInput.value.trim();
+    const canAsk = !!pendingContext || conversation.some((m) => m.role === "assistant");
+    if (!q || busy || !canAsk) return;
+    const sid = currentId;
+    askInput.value = "";
+    askInput.style.height = "";
+    clearPlaceholderIfEmpty();
+    const bubble = document.createElement("div");
+    bubble.className = "explain-q";
+    bubble.textContent = q;
+    explainBody.appendChild(bubble);
+    explainBody.scrollTop = explainBody.scrollHeight;
+    // A code-free session prepends the stashed problem context to its first turn.
+    const content = pendingContext ? pendingContext + `My question: ${q}` : q;
+    conversation.push({ role: "user", content });
+    await runTurn();
+    if (currentId === sid) persistChat(sid);
+  }
+
+  explainBtn.onclick = explain;
+  keyBtn.onclick = setApiKey;
+  explainClose.onclick = closeExplainPanel;
+  askBtn.onclick = askFollowUp;
+  // Enter sends, Shift+Enter inserts a newline; grow the box up to its max.
+  askInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askFollowUp(); }
+  });
+  askInput.addEventListener("input", () => {
+    askInput.style.height = "auto";
+    askInput.style.height = Math.min(askInput.scrollHeight, 120) + "px";
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && explainPanel.classList.contains("open")) closeExplainPanel();
+  });
+
+  // ---------- collapsible sidebar ----------
+  const COLLAPSE_KEY = "plc:sidebar-collapsed";
+  function setCollapsed(collapsed) {
+    document.body.classList.toggle("sidebar-collapsed", collapsed);
+    localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
+    // CodeMirror needs a nudge to re-measure after the layout width changes.
+    cm.refresh();
+  }
+  const toggleSidebar = () =>
+    setCollapsed(!document.body.classList.contains("sidebar-collapsed"));
+  collapseBtn.onclick = toggleSidebar;
+  sidebarToggle.onclick = toggleSidebar;
+
+  // ---------- filter controls ----------
+  filterSearch.addEventListener("input", () => {
+    filters.q = filterSearch.value;
+    saveFilters();
+    renderList();
+  });
+  filterDiff.addEventListener("click", (e) => {
+    const btn = e.target.closest(".filter-chip");
+    if (!btn) return;
+    filters.diff = btn.dataset.diff;
+    saveFilters();
+    syncFilterUI();
+    renderList();
+  });
+  filterStatus.addEventListener("click", (e) => {
+    const btn = e.target.closest(".filter-chip");
+    if (!btn) return;
+    filters.status = btn.dataset.status;
+    saveFilters();
+    syncFilterUI();
+    renderList();
+  });
+
+  // ---------- resizable sidebar ----------
+  const SIDEBAR_WIDTH_KEY = "plc:sidebar-width";
+  const SIDEBAR_MIN = 180;
+  const SIDEBAR_MAX = 460;
+  const sidebarEl = document.getElementById("sidebar");
+  const sidebarResizer = document.getElementById("sidebar-resizer");
+  function applySidebarWidth(px) {
+    const w = Math.round(Math.min(Math.max(px, SIDEBAR_MIN), SIDEBAR_MAX));
+    sidebarEl.style.width = w + "px";
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(w));
+    cm.refresh();
+  }
+  const savedSidebarWidth = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+  if (savedSidebarWidth) applySidebarWidth(savedSidebarWidth);
+
+  sidebarResizer.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sidebarEl.getBoundingClientRect().width;
+    document.body.classList.add("sidebar-resizing");
+    const onMove = (ev) => applySidebarWidth(startW + (ev.clientX - startX));
+    const onUp = () => {
+      document.body.classList.remove("sidebar-resizing");
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+  // Double-click the handle to reset to the default width.
+  sidebarResizer.addEventListener("dblclick", () => {
+    sidebarEl.style.width = "";
+    localStorage.removeItem(SIDEBAR_WIDTH_KEY);
+    cm.refresh();
+  });
+
+  // ---------- resizable description pane ----------
+  const DESC_WIDTH_KEY = "plc:desc-width";
+  const DESC_MIN = 280;
+  const resizer = document.getElementById("desc-resizer");
+  // Leave room for the sidebar (its actual, possibly-resized width) and a
+  // usable editor column.
+  const descMaxWidth = () => {
+    const sidebar = document.body.classList.contains("sidebar-collapsed")
+      ? 0 : document.getElementById("sidebar").getBoundingClientRect().width;
+    return Math.max(DESC_MIN, window.innerWidth - sidebar - 360);
+  };
+  function applyDescWidth(px) {
+    const w = Math.round(Math.min(Math.max(px, DESC_MIN), descMaxWidth()));
+    descEl.style.width = w + "px";
+    localStorage.setItem(DESC_WIDTH_KEY, String(w));
+    cm.refresh();
+  }
+  const savedDescWidth = Number(localStorage.getItem(DESC_WIDTH_KEY));
+  if (savedDescWidth) applyDescWidth(savedDescWidth);
+
+  resizer.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = descEl.getBoundingClientRect().width;
+    document.body.classList.add("desc-resizing");
+    const onMove = (ev) => applyDescWidth(startW + (ev.clientX - startX));
+    const onUp = () => {
+      document.body.classList.remove("desc-resizing");
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+  // Double-click the handle to reset to the default width.
+  resizer.addEventListener("dblclick", () => {
+    descEl.style.width = "";
+    localStorage.removeItem(DESC_WIDTH_KEY);
+    cm.refresh();
+  });
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ---------- init ----------
+  setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
+  syncFilterUI();
+  renderList();
+  // Open the problem named in the URL hash (from the Problems hub), else the first.
+  const hashId = decodeURIComponent(location.hash.slice(1));
+  const startId = PROBLEMS.some((p) => p.id === hashId) ? hashId : (PROBLEMS[0] && PROBLEMS[0].id);
+  if (startId) selectProblem(startId);
+
+  // React to hash changes (back/forward, or clicking another hub link while open).
+  window.addEventListener("hashchange", () => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    if (id && id !== currentId && PROBLEMS.some((p) => p.id === id)) selectProblem(id);
+  });
+})();
+</script>
+</body>
+</html>

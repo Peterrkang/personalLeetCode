@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JS/TS Cheatsheet</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav><div class="inner">
+  <span class="brand">📚 Prep Plan</span>
+  <a href="index.html">Overview</a>
+  <a href="system-design-curriculum.html">SD Curriculum</a>
+  <a href="../system-design/index.html">SD Notes</a>
+  <a href="dsa-patterns.html">Patterns</a>
+  <a href="algo-templates.html">Boiler Plate</a>
+  <a href="js-ts-cheatsheet.html" class="active">JS Cheatsheet</a>
+  <a href="flashcards.html">Flashcards</a>
+  <a href="playground.html">Playground</a>
+</div></nav>
+<div class="wrap">
+
+<h1>JavaScript / TypeScript — Interview Cheat Sheet</h1>
+<p class="subtitle">Know these cold so you spend brainpower on the algorithm, not the syntax.</p>
+
+<h2>Gotchas</h2>
+<ul>
+<li><strong>Default sort is lexicographic.</strong> <code>[10, 2, 1].sort()</code> → <code>[1, 10, 2]</code>. Always pass a comparator: <code>arr.sort((a, b) =&gt; a - b)</code>.</li>
+<li><strong>No built-in heap/priority queue.</strong> Write your own (below). This is the #1 JS interview gap.</li>
+<li><code>Map</code> preserves insertion order and allows any key type — prefer over <code>{}</code> for frequency counts when keys aren't strings.</li>
+<li><code>Set</code> for O(1) membership: <code>new Set(arr)</code>, <code>.has(x)</code>, <code>.add(x)</code>.</li>
+<li>Integer division: <code>Math.floor(a / b)</code>. Beware negatives: <code>Math.trunc</code> for truncation toward zero.</li>
+<li><code>Number.MAX_SAFE_INTEGER</code> ≈ 9e15. Use <code>Infinity</code> / <code>-Infinity</code> for init in min/max.</li>
+<li>Copying: <code>[...arr]</code> (shallow). 2D grid copy: <code>grid.map(r =&gt; [...r])</code>.</li>
+<li>Char ↔ code: <code>'a'.charCodeAt(0)</code> → 97; <code>String.fromCharCode(97)</code> → 'a'.</li>
+</ul>
+
+<h2>Essential methods to know cold</h2>
+
+<h3>Array — the workhorses (all return a NEW array / value)</h3>
+<pre><code>arr.forEach((val, i) =&gt; { ... })        // side effects only, no return
+arr.map((val, i) =&gt; val * 2)            // NEW array, same length
+arr.filter((val) =&gt; val &gt; 0)            // NEW array, subset
+arr.reduce((acc, val) =&gt; acc + val, 0)  // fold to one value; 0 = initial
+
+arr.includes(3)         // true/false — "does it contain"
+arr.indexOf(3)          // index or -1
+arr.find(v =&gt; v &gt; 5)    // first VALUE matching, or undefined
+arr.findIndex(v =&gt; v&gt;5) // first INDEX matching, or -1
+arr.some(v =&gt; v &gt; 5)    // true if ANY match
+arr.every(v =&gt; v &gt; 0)   // true if ALL match</code></pre>
+
+<h3>Array — mutation (changes the array in place)</h3>
+<pre><code>arr.push(x)        // add to END,   returns new length   → STACK with pop()
+arr.pop()          // remove END,   returns removed item
+arr.shift()        // remove FRONT, returns item — O(n), avoid in loops
+arr.unshift(x)     // add to FRONT, returns new length — O(n)
+arr.reverse()      // in place
+arr.splice(i, n)   // remove n items at i; can also insert
+arr.fill(0)        // fill all slots; new Array(n).fill(0) is the idiom</code></pre>
+<p class="note"><strong>slice vs splice:</strong> <code>arr.slice(1, 3)</code> returns a COPY of [1,3) and leaves the original alone; <code>arr.splice(1, 3)</code> CUTS items out and mutates. Mnemonic: <strong>spl</strong>ice <strong>sp</strong>oils the original.</p>
+
+<h3>String — every two-pointer / parsing problem</h3>
+<pre><code>str.length              // property, no parens
+str[i] / str.charAt(i)  // single char
+str.charCodeAt(i)       // ASCII/Unicode code — anagram &amp; counting tricks
+str.split("")           // string → array of chars (then map/sort/etc.)
+str.split(" ")          // split on delimiter
+arr.join("")            // array → string back
+str.slice(1, 3)         // substring; negatives ok: slice(-1) = last char
+str.substring(1, 3)     // like slice but no negatives
+str.toLowerCase()       // valid-palindrome staple
+str.trim()              // strip whitespace ends
+str.replace(/[^a-z0-9]/gi, "")  // strip non-alphanumeric
+str.repeat(3) / str.padStart(3, "0")  // "5" → "005"</code></pre>
+<p class="note">Strings are <strong>immutable</strong> — every "modify" returns a new string. To mutate: <code>split("")</code> → work on the array → <code>join("")</code>.</p>
+
+<h3>Building arrays / ranges</h3>
+<pre><code>Array.from({length: n}, (_, i) =&gt; i)   // [0, 1, ..., n-1]
+Array.from({length: m}, () =&gt; new Array(n).fill(0))  // m×n grid of 0s
+[...arr]                  // shallow copy
+grid.map(r =&gt; [...r])     // deep-ish copy of a 2D grid</code></pre>
+
+<h3>Frequency count — the most common pattern</h3>
+<pre><code>const count = new Map();
+for (const ch of str) count.set(ch, (count.get(ch) || 0) + 1);
+// plain object alt: count[ch] = (count[ch] || 0) + 1
+// "are all unique?":  new Set(arr).size === arr.length</code></pre>
+
+<p class="note"><strong>Watch out:</strong> <code>map</code>/<code>filter</code> return new arrays, but mutators return something else — chaining <code>arr.push(x).pop()</code> breaks because <code>push</code> returns a number, not the array.</p>
+
+<h3>Map — full method list</h3>
+<pre><code>const m = new Map();          // or new Map([["a", 1], ["b", 2]])
+m.set("a", 1)                 // add/update; RETURNS the map (chainable)
+m.get("a")                    // value, or undefined if missing
+m.has("a")                    // true/false
+m.delete("a")                 // remove one key; returns true if it existed
+m.clear()                     // remove everything
+m.size                        // count (property, no parens)
+
+// ITERATE — insertion order is preserved
+for (const [k, v] of m) { ... }        // entries by default
+for (const k of m.keys()) { ... }
+for (const v of m.values()) { ... }
+m.forEach((v, k) =&gt; { ... })           // note: value first, key second!
+
+[...m]            // → [[k, v], ...]   array of entries
+[...m.keys()]     // → [k, ...]
+[...m.values()]   // → [v, ...]
+Object.fromEntries(m)  // Map → plain object (string/number keys)</code></pre>
+<p class="note"><strong>Map vs <code>{}</code>:</strong> any key type (objects, numbers stay numbers), guaranteed insertion order, real <code>.size</code>, and no prototype-key collisions (<code>"toString"</code> etc.). Prefer it for frequency counts and adjacency lists.</p>
+
+<h3>Set — full method list</h3>
+<pre><code>const s = new Set();          // or new Set([1, 2, 2, 3]) → {1, 2, 3}
+s.add(1)                      // add; RETURNS the set (chainable), ignores dups
+s.has(1)                      // true/false — O(1) membership
+s.delete(1)                   // remove; returns true if it existed
+s.clear()                     // remove everything
+s.size                        // count (property, no parens)
+
+// ITERATE — insertion order
+for (const v of s) { ... }
+s.forEach(v =&gt; { ... })
+[...s]                        // Set → array (classic dedup: [...new Set(arr)])
+
+// common one-liners
+new Set(arr).size === arr.length   // "are all elements unique?"
+const inBoth = a.filter(x =&gt; setB.has(x));   // intersection of arrays</code></pre>
+<p class="note">No built-in union/intersection in older runtimes — build them with <code>has</code> + a loop/filter as above. (Newer engines add <code>s.union/intersection/difference</code>, but don't rely on them in interviews.)</p>
+
+<h2>Snippets</h2>
+
+<h3>Min-Heap / Priority Queue (the must-have)</h3>
+<pre><code>class MinHeap {
+  constructor() { this.h = []; }
+  size() { return this.h.length; }
+  peek() { return this.h[0]; }
+  push(v) {
+    this.h.push(v);
+    let i = this.h.length - 1;
+    while (i &gt; 0) {
+      const p = (i - 1) &gt;&gt; 1;
+      if (this.h[p] &lt;= this.h[i]) break;
+      [this.h[p], this.h[i]] = [this.h[i], this.h[p]];
+      i = p;
+    }
+  }
+  pop() {
+    const top = this.h[0], last = this.h.pop();
+    if (this.h.length) {
+      this.h[0] = last;
+      let i = 0, n = this.h.length;
+      while (true) {
+        let l = 2*i+1, r = 2*i+2, s = i;
+        if (l &lt; n &amp;&amp; this.h[l] &lt; this.h[s]) s = l;
+        if (r &lt; n &amp;&amp; this.h[r] &lt; this.h[s]) s = r;
+        if (s === i) break;
+        [this.h[s], this.h[i]] = [this.h[i], this.h[s]];
+        i = s;
+      }
+    }
+    return top;
+  }
+}
+// For a max-heap or objects, store [priority, value] and compare on [0].</code></pre>
+
+<h3>Queue with O(1) dequeue (don't use array.shift in loops — it's O(n))</h3>
+<pre><code>class Queue {
+  constructor() { this.q = {}; this.front = 0; this.back = 0; }
+  push(v) { this.q[this.back++] = v; }
+  pop() { const v = this.q[this.front]; delete this.q[this.front++]; return v; }
+  size() { return this.back - this.front; }
+}</code></pre>
+
+<h3>Union-Find (Disjoint Set)</h3>
+<pre><code>class DSU {
+  constructor(n) { this.p = Array.from({length: n}, (_, i) =&gt; i); this.r = new Array(n).fill(0); }
+  find(x) { return this.p[x] === x ? x : (this.p[x] = this.find(this.p[x])); }
+  union(a, b) {
+    a = this.find(a); b = this.find(b);
+    if (a === b) return false;
+    if (this.r[a] &lt; this.r[b]) [a, b] = [b, a];
+    this.p[b] = a;
+    if (this.r[a] === this.r[b]) this.r[a]++;
+    return true;
+  }
+}</code></pre>
+
+<h3>Trie</h3>
+<pre><code>class TrieNode { constructor() { this.children = {}; this.end = false; } }
+class Trie {
+  constructor() { this.root = new TrieNode(); }
+  insert(word) {
+    let node = this.root;
+    for (const c of word) node = node.children[c] ??= new TrieNode();
+    node.end = true;
+  }
+  search(word) {
+    let node = this.root;
+    for (const c of word) { if (!node.children[c]) return false; node = node.children[c]; }
+    return node.end;
+  }
+}</code></pre>
+
+<h3>Binary search template (lower bound)</h3>
+<pre><code>function lowerBound(arr, target) {
+  let lo = 0, hi = arr.length; // hi exclusive
+  while (lo &lt; hi) {
+    const mid = (lo + hi) &gt;&gt; 1;
+    if (arr[mid] &lt; target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo; // first index where arr[i] &gt;= target
+}</code></pre>
+
+<h3>Graph BFS / DFS skeletons</h3>
+<pre><code>// BFS
+function bfs(start, adj) {
+  const seen = new Set([start]); const q = [start];
+  for (let i = 0; i &lt; q.length; i++) {
+    const node = q[i];
+    for (const nxt of adj[node]) if (!seen.has(nxt)) { seen.add(nxt); q.push(nxt); }
+  }
+}
+// DFS (recursive)
+function dfs(node, adj, seen = new Set()) {
+  seen.add(node);
+  for (const nxt of adj[node]) if (!seen.has(nxt)) dfs(nxt, adj, seen);
+}</code></pre>
+
+<h2>TypeScript notes for interviews</h2>
+<ul>
+<li>Most interviewers are fine with plain JS; TS types are a bonus, not required. Don't let type-wrangling eat your clock.</li>
+<li>If asked to use TS, keep it light: <code>function twoSum(nums: number[], target: number): number[]</code>.</li>
+<li><code>const map = new Map&lt;string, number&gt;()</code> reads well and shows intent.</li>
+</ul>
+
+<p class="footer"><a href="index.html">← Back to overview</a></p>
+</div>
+</body>
+</html>

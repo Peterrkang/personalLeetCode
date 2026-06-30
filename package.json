@@ -1,0 +1,7 @@
+{
+  "name": "personal-leetcode",
+  "version": "1.0.0",
+  "description": "A local, in-browser LeetCode-style playground. Open study-plan/playground.html.",
+  "type": "module",
+  "license": "MIT"
+}

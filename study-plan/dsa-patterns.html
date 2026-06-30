@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DSA Pattern Table</title>
+<link rel="stylesheet" href="style.css">
+<style>
+ 
+
+  /* ---------- View bar (Table chip + New) ---------- */
+  .nb-viewbar {
+    display: flex; align-items: center; gap: 4px;
+    margin: 14px 0 4px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .nb-view {
+    font-size: 14px; padding: 6px 10px; color: var(--text);
+    border-bottom: 2px solid var(--text); margin-bottom: -7px;
+  }
+  .nb-view .ico { color: var(--muted); margin-right: 5px; }
+  .nb-spacer { flex: 1; }
+  .nb-new {
+    font-size: 13px; font-weight: 600; color: var(--bg); background: var(--accent);
+    padding: 5px 12px; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+
+  /* ---------- The wider, detailed table ---------- */
+  /* Use (almost) the full viewport width so the 8 columns fit without a
+     horizontal scrollbar — cells wrap their text instead. */
+  .wrap.full { max-width: none; width: 100%; padding: 0 20px 80px; }
+  .table-scroll {
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: calc(100vh - 230px);
+    margin: 12px 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .patterns {
+    margin: 0; border-collapse: separate; border-spacing: 0;
+    width: 100%; table-layout: fixed; font-size: 13px;
+  }
+  .patterns th, .patterns td {
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    padding: 11px 13px; vertical-align: top;
+    overflow-wrap: anywhere; word-break: normal;
+  }
+  .patterns th:last-child, .patterns td:last-child { border-right: none; }
+  .patterns tbody tr:last-child td { border-bottom: none; }
+  .patterns thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--panel-2); color: var(--muted);
+    font-size: 12px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .patterns tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.012); }
+  .patterns tbody tr:hover td { background: rgba(92, 200, 255, 0.06); }
+
+  /* column sizing — percentages so the fixed layout fills the width exactly */
+  .c-pattern { width: 9%; }
+  .c-goal    { width: 11%; }
+  .c-ds      { width: 9%; }
+  .c-algo    { width: 10%; }
+  .c-opt     { width: 10%; }
+  .c-details { width: 19%; }
+  .c-rat     { width: 18%; }
+  .c-q       { width: 14%; }
+
+  td.c-pattern { font-weight: 700; color: #fff; }
+  td.c-goal { color: var(--text); }
+  td.c-algo { color: #ff9d9d; }      /* brute force */
+  td.c-opt  { color: #8ce99a; }      /* optimized */
+  .mono { font-family: "SF Mono", Consolas, Monaco, monospace; font-size: 12px; color: var(--accent); }
+
+  /* numbered steps inside cells */
+  .patterns ol { margin: 0; padding-left: 18px; }
+  .patterns ol li { margin: 3px 0; line-height: 1.5; }
+  .patterns .c-q a { display: block; margin: 2px 0; }
+
+  /* Notion-style property pills (Data structure) */
+  .pill {
+    display: inline-block; font-size: 12px; line-height: 1.5;
+    padding: 1px 9px; margin: 1px 3px 1px 0;
+    border-radius: 999px; border: 1px solid var(--border); white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<nav><div class="inner">
+  <span class="brand">📚 Prep Plan</span>
+  <a href="index.html">Overview</a>
+  <a href="system-design-curriculum.html">SD Curriculum</a>
+  <a href="../system-design/index.html">SD Notes</a>
+  <a href="dsa-patterns.html" class="active">Patterns</a>
+  <a href="algo-templates.html">Boiler Plate</a>
+  <a href="js-ts-cheatsheet.html">JS Cheatsheet</a>
+  <a href="flashcards.html">Flashcards</a>
+  <a href="playground.html">Playground</a>
+</div></nav>
+<div class="wrap full">
+
+
+<div class="table-scroll">
+<table class="patterns">
+<colgroup>
+  <col class="c-pattern"><col class="c-goal"><col class="c-ds"><col class="c-algo">
+  <col class="c-opt"><col class="c-details"><col class="c-rat"><col class="c-q">
+</colgroup>
+<thead>
+<tr>
+  <th>Pattern</th>
+  <th>Problem goal</th>
+  <th>Data structure</th>
+  <th>Algorithm (brute force)</th>
+  <th>Optimization</th>
+  <th>Optimization details</th>
+  <th>Rationale</th>
+  <th>Question name / link</th>
+</tr>
+</thead>
+<tbody>
+
+<tr>
+  <td class="c-pattern">Two Pointers</td>
+  <td class="c-goal">Find a pair or partition in a sorted / order-able array</td>
+  <td class="c-ds">Array, String</td>
+  <td class="c-algo">Nested loop over all pairs — <span class="mono">O(n²)</span></td>
+  <td class="c-opt">Two pointers sweeping inward — <span class="mono">O(n)</span></td>
+  <td><ol>
+    <li>Rely on sorted order (or sort first).</li>
+    <li>Put one pointer at the left end, one at the right.</li>
+    <li>Evaluate the pair against the target / condition.</li>
+    <li>Need a bigger value → move left in; need smaller → move right in.</li>
+    <li>Stop when the pointers cross.</li>
+  </ol></td>
+  <td><ol>
+    <li>In sorted order, one comparison proves which side can never improve, so it's discarded.</li>
+    <li>Each pointer only advances one direction, so every element is visited once → linear.</li>
+    <li>No pair is ever rechecked.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#two-sum-ii">Two Sum II</a>
+    <a href="playground.html#3sum">3Sum</a>
+    <a href="playground.html#container-with-most-water">Container With Most Water</a>
+    <a href="playground.html#valid-palindrome">Valid Palindrome</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Fast &amp; Slow Pointers</td>
+  <td class="c-goal">Detect a cycle / find the middle in O(1) space</td>
+  <td class="c-ds">Linked List</td>
+  <td class="c-algo">Hash set of visited nodes — <span class="mono">O(n)</span> space</td>
+  <td class="c-opt">Floyd's two-speed pointers — <span class="mono">O(1)</span> space</td>
+  <td><ol>
+    <li>Advance slow by 1 and fast by 2 each step.</li>
+    <li>If fast hits null, there is no cycle.</li>
+    <li>If slow and fast meet, a cycle exists.</li>
+    <li>To find the cycle's start, reset one pointer to head and step both by 1 until they meet.</li>
+  </ol></td>
+  <td><ol>
+    <li>Inside a loop the fast pointer gains exactly one node per step on the slow, so it must land on it.</li>
+    <li>Distances from head and from the meeting point to the cycle start are equal — that's why the reset trick works.</li>
+    <li>Only two pointers are stored → constant space.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#linked-list-cycle">Linked List Cycle</a>
+    <a href="playground.html#middle-of-linked-list">Middle of the Linked List</a>
+    <a href="playground.html#happy-number">Happy Number</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Sliding Window</td>
+  <td class="c-goal">Best contiguous subarray / substring under a constraint</td>
+  <td class="c-ds">Array, String</td>
+  <td class="c-algo">Recompute every window — <span class="mono">O(n²)</span></td>
+  <td class="c-opt">One expanding/shrinking window — <span class="mono">O(n)</span></td>
+  <td><ol>
+    <li>Advance <em>right</em>, adding the new element to a running state.</li>
+    <li>While the window violates the constraint, advance <em>left</em> and undo that element's contribution.</li>
+    <li>After each step, record the best valid window seen.</li>
+  </ol></td>
+  <td><ol>
+    <li>Left only ever moves forward, so each element enters and leaves the window at most once → linear.</li>
+    <li>The running state means a window is never recomputed from scratch.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#longest-substring-without-repeating">Longest Substring Without Repeating</a>
+    <a href="playground.html#minimum-window-substring">Minimum Window Substring</a>
+    <a href="playground.html#max-consecutive-ones-iii">Max Consecutive Ones III</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Prefix Sum</td>
+  <td class="c-goal">Many range-sum / subarray-sum queries</td>
+  <td class="c-ds">Array, Hash Map</td>
+  <td class="c-algo">Re-add each range on demand — <span class="mono">O(n²)</span></td>
+  <td class="c-opt">Precomputed prefixes + hash map — <span class="mono">O(n)</span></td>
+  <td><ol>
+    <li>Build <span class="mono">prefix[i]</span> = sum of the first i elements.</li>
+    <li>Any range sum (i, j) = <span class="mono">prefix[j] − prefix[i]</span>.</li>
+    <li>For "subarray sums to K", store counts of seen prefixes in a map and look up <span class="mono">prefix − K</span>.</li>
+  </ol></td>
+  <td><ol>
+    <li>A range sum reuses two precomputed numbers instead of re-adding the whole range.</li>
+    <li>The hash map turns "find a matching earlier prefix" into an O(1) lookup.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#subarray-sum-equals-k">Subarray Sum Equals K</a>
+    <a href="playground.html#range-sum-query">Range Sum Query</a>
+    <a href="playground.html#contiguous-array">Contiguous Array</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Binary Search</td>
+  <td class="c-goal">Value, or smallest/largest X satisfying a monotonic predicate</td>
+  <td class="c-ds">Array</td>
+  <td class="c-algo">Linear scan — <span class="mono">O(n)</span></td>
+  <td class="c-opt">Halve the range each step — <span class="mono">O(log n)</span></td>
+  <td><ol>
+    <li>Set <span class="mono">lo</span>/<span class="mono">hi</span> bounds and a predicate that goes false → true.</li>
+    <li>Test <span class="mono">mid</span>; if it satisfies the predicate keep the left half (<span class="mono">hi = mid</span>), else discard it (<span class="mono">lo = mid + 1</span>).</li>
+    <li>Converge until <span class="mono">lo == hi</span> — the boundary answer.</li>
+  </ol></td>
+  <td><ol>
+    <li>Monotonicity guarantees the answer lies entirely on one side of mid, so the other half is safe to drop.</li>
+    <li>Discarding half each step gives log n iterations.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#search-insert-position">Search Insert Position</a>
+    <a href="playground.html#koko-eating-bananas">Koko Eating Bananas</a>
+    <a href="playground.html#find-min-rotated-sorted-array">Find Min in Rotated Sorted Array</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Quickselect</td>
+  <td class="c-goal">Kth smallest / largest without a full sort</td>
+  <td class="c-ds">Array</td>
+  <td class="c-algo">Sort then index — <span class="mono">O(n log n)</span></td>
+  <td class="c-opt">Partition, recurse one side — <span class="mono">O(n)</span> avg</td>
+  <td><ol>
+    <li>Choose a pivot (randomized to avoid worst case).</li>
+    <li>Partition: smaller elements left, larger right.</li>
+    <li>If the pivot's final index equals K, return it.</li>
+    <li>Otherwise recurse only into the side that contains K.</li>
+  </ol></td>
+  <td><ol>
+    <li>The half that can't contain the Kth element is never processed.</li>
+    <li>Average work halves each step → O(n); a bad pivot degrades to O(n²), which randomization makes unlikely.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#kth-largest-element">Kth Largest Element</a>
+    <a href="playground.html#median-of-two-sorted-arrays">Median of Two Sorted Arrays</a>
+    <a href="playground.html#top-k-frequent">Top K (heap alt.)</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Merge Intervals</td>
+  <td class="c-goal">Combine or query overlapping intervals</td>
+  <td class="c-ds">Array</td>
+  <td class="c-algo">Compare every interval pair — <span class="mono">O(n²)</span></td>
+  <td class="c-opt">Sort by start, single sweep — <span class="mono">O(n log n)</span></td>
+  <td><ol>
+    <li>Sort the intervals by start.</li>
+    <li>Walk through; if <span class="mono">current.start ≤ last.end</span>, merge by extending the end.</li>
+    <li>Otherwise push the current interval as a new block.</li>
+  </ol></td>
+  <td><ol>
+    <li>After sorting, any overlap can only be with the immediately previous interval.</li>
+    <li>The sweep is O(n), so the sort dominates at O(n log n).</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#merge-intervals">Merge Intervals</a>
+    <a href="playground.html#insert-interval">Insert Interval</a>
+    <a href="playground.html#meeting-rooms-ii">Meeting Rooms II</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">DFS</td>
+  <td class="c-goal">Explore a full path / connected region</td>
+  <td class="c-ds">Graph, Stack, Tree</td>
+  <td class="c-algo">Re-exploring without marking — blows up</td>
+  <td class="c-opt">Recursion/stack + visited set — <span class="mono">O(V + E)</span></td>
+  <td><ol>
+    <li>Visit a node and mark it seen.</li>
+    <li>Recurse into each unseen neighbor.</li>
+    <li>Backtrack when no unseen neighbors remain.</li>
+  </ol></td>
+  <td><ol>
+    <li>The visited set stops re-processing, bounding work to V + E.</li>
+    <li>Going deep before wide maps naturally onto the call stack / an explicit stack.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#number-of-islands">Number of Islands</a>
+    <a href="playground.html#clone-graph">Clone Graph</a>
+    <a href="playground.html#path-sum">Path Sum</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Backtracking</td>
+  <td class="c-goal">Enumerate all valid subsets / permutations / combinations</td>
+  <td class="c-ds">Graph, Tree (decision tree)</td>
+  <td class="c-algo">Generate everything, then filter — wasteful</td>
+  <td class="c-opt">Choose → recurse → undo, pruning early — exponential but pruned</td>
+  <td><ol>
+    <li>Make a choice and append it to the current path.</li>
+    <li>Recurse to extend the path further.</li>
+    <li>Remove the choice (undo) before trying the next option.</li>
+    <li>Prune the moment a partial path can't reach a valid answer.</li>
+  </ol></td>
+  <td><ol>
+    <li>Early pruning skips entire invalid subtrees instead of generating them.</li>
+    <li>Undoing lets a single shared path array serve every branch — no per-branch copies.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#subsets">Subsets</a>
+    <a href="playground.html#permutations">Permutations</a>
+    <a href="playground.html#n-queens">N-Queens</a>
+    <a href="playground.html#combination-sum">Combination Sum</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">BFS</td>
+  <td class="c-goal">Shortest path / level order in an unweighted graph or grid</td>
+  <td class="c-ds">Graph, Queue, Tree</td>
+  <td class="c-algo">Try all paths — exponential</td>
+  <td class="c-opt">Queue, level by level — <span class="mono">O(V + E)</span></td>
+  <td><ol>
+    <li>Enqueue the start and mark it seen.</li>
+    <li>Pop nodes; enqueue each unseen neighbor, recording its distance / level.</li>
+    <li>Finish a whole level before starting the next.</li>
+  </ol></td>
+  <td><ol>
+    <li>The first time a node is dequeued, it was reached by a shortest unweighted path.</li>
+    <li>Every node and edge is handled once → O(V + E).</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#word-ladder">Word Ladder</a>
+    <a href="playground.html#rotting-oranges">Rotting Oranges</a>
+    <a href="playground.html#binary-tree-level-order">Binary Tree Level Order Traversal</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Trie</td>
+  <td class="c-goal">Prefix lookups / autocomplete over a word set</td>
+  <td class="c-ds">Trie</td>
+  <td class="c-algo">Scan all words per query — <span class="mono">O(n·L)</span></td>
+  <td class="c-opt">Char-by-char prefix tree — <span class="mono">O(L)</span> per lookup</td>
+  <td><ol>
+    <li>Insert each word character by character, creating nodes as needed.</li>
+    <li>Flag the final node as end-of-word.</li>
+    <li>Lookup / prefix queries walk down matching child nodes.</li>
+  </ol></td>
+  <td><ol>
+    <li>Shared prefixes are stored once, so lookup cost depends only on the word's length.</li>
+    <li>Prefix queries stop early at the branch point instead of scanning every word.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#implement-trie">Implement Trie</a>
+    <a href="playground.html#word-search-ii">Word Search II</a>
+    <a href="playground.html#add-and-search-words">Design Add and Search Words</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Union-Find</td>
+  <td class="c-goal">Dynamic connectivity / grouping / undirected cycle detection</td>
+  <td class="c-ds">Union-Find</td>
+  <td class="c-algo">DFS/BFS per query — <span class="mono">O(V + E)</span> each</td>
+  <td class="c-opt">Path compression + union by rank — <span class="mono">~O(α(n))</span></td>
+  <td><ol>
+    <li><span class="mono">find(x)</span> returns the set's root, compressing the path on the way up.</li>
+    <li><span class="mono">union(a, b)</span> links the smaller-rank root under the larger.</li>
+    <li>Two nodes are connected iff they share a root.</li>
+  </ol></td>
+  <td><ol>
+    <li>Path compression flattens the trees, so repeated queries become near-constant.</li>
+    <li>Union by rank keeps trees shallow, bounding find depth.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#number-of-provinces">Number of Provinces</a>
+    <a href="playground.html#redundant-connection">Redundant Connection</a>
+    <a href="playground.html#accounts-merge">Accounts Merge</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Heap / Top-K</td>
+  <td class="c-goal">K largest/smallest, streaming median, merge K lists</td>
+  <td class="c-ds">Heap</td>
+  <td class="c-algo">Sort everything — <span class="mono">O(n log n)</span></td>
+  <td class="c-opt">Maintain a size-K heap — <span class="mono">O(n log k)</span></td>
+  <td><ol>
+    <li>Push elements into a heap.</li>
+    <li>When the size exceeds K, pop the extreme so only the best K remain.</li>
+    <li>The root is the Kth element / next item to emit.</li>
+  </ol></td>
+  <td><ol>
+    <li>You only ever order K items, never all n.</li>
+    <li>log k per push beats log n whenever k ≪ n.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#kth-largest-element">Kth Largest Element</a>
+    <a href="playground.html#top-k-frequent">Top K Frequent Elements</a>
+    <a href="playground.html#find-median-data-stream">Find Median from Data Stream</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Dijkstra</td>
+  <td class="c-goal">Shortest path with non-negative weights</td>
+  <td class="c-ds">Graph, Heap</td>
+  <td class="c-algo">Bellman-Ford relaxes all edges V times — <span class="mono">O(VE)</span></td>
+  <td class="c-opt">Greedy min-heap expansion — <span class="mono">O(E log V)</span></td>
+  <td><ol>
+    <li>Push the source with distance 0.</li>
+    <li>Pop the closest unfinalized node and finalize its distance.</li>
+    <li>Relax its outgoing edges, pushing any improved neighbor distance.</li>
+  </ol></td>
+  <td><ol>
+    <li>With non-negative edges, the closest unfinalized node's distance can never improve later, so it's safe to lock in.</li>
+    <li>The min-heap returns the next closest node in log V.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#network-delay-time">Network Delay Time</a>
+    <a href="playground.html#path-with-minimum-effort">Path With Minimum Effort</a>
+    <a href="playground.html#cheapest-flights-k-stops">Cheapest Flights Within K Stops</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Topological Sort</td>
+  <td class="c-goal">Order respecting dependencies (DAG); detect cycles</td>
+  <td class="c-ds">Graph</td>
+  <td class="c-algo">Guess an order, recheck — wasteful</td>
+  <td class="c-opt">Peel in-degree-0 nodes (Kahn's) — <span class="mono">O(V + E)</span></td>
+  <td><ol>
+    <li>Compute in-degrees; enqueue every 0-in-degree node.</li>
+    <li>Pop a node into the order; decrement each neighbor's in-degree.</li>
+    <li>Enqueue any neighbor that drops to 0. Leftover nodes ⇒ a cycle.</li>
+  </ol></td>
+  <td><ol>
+    <li>In-degree 0 means all prerequisites are already placed, so the node is safe to output.</li>
+    <li>Each node and edge is touched once → O(V + E).</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#course-schedule">Course Schedule I/II</a>
+    <a href="playground.html#alien-dictionary">Alien Dictionary</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">Monotonic Stack</td>
+  <td class="c-goal">Next/previous greater-or-smaller, spans, histogram</td>
+  <td class="c-ds">Stack</td>
+  <td class="c-algo">For each element scan the rest — <span class="mono">O(n²)</span></td>
+  <td class="c-opt">One pass, monotonic stack — <span class="mono">O(n)</span></td>
+  <td><ol>
+    <li>Iterate once, keeping the stack increasing (or decreasing).</li>
+    <li>When the new element breaks the order, pop the violators — the new element is their answer.</li>
+    <li>Push the new element.</li>
+  </ol></td>
+  <td><ol>
+    <li>Each element is pushed and popped at most once → linear.</li>
+    <li>The stack invariant guarantees the breaking element is exactly the resolved answer.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#daily-temperatures">Daily Temperatures</a>
+    <a href="playground.html#next-greater-element">Next Greater Element</a>
+    <a href="playground.html#largest-rectangle-histogram">Largest Rectangle in Histogram</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">DP – Tabulation (Bottom-Up)</td>
+  <td class="c-goal">Optimal/count over overlapping subproblems, iteratively</td>
+  <td class="c-ds">Array (table)</td>
+  <td class="c-algo">Plain recursion recomputes states — <span class="mono">O(2ⁿ)</span></td>
+  <td class="c-opt">Fill a table in dependency order — <span class="mono">O(#states × transitions)</span></td>
+  <td><ol>
+    <li>Define the state and its base cases.</li>
+    <li>Fill the table from the base cases upward to the target.</li>
+    <li>Often keep only the last row / few rows to shrink space.</li>
+  </ol></td>
+  <td><ol>
+    <li>Each state is computed exactly once in order, so nothing is recomputed.</li>
+    <li>The iterative form avoids the recursion stack and enables O(1)-row space.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#climbing-stairs">Climbing Stairs</a>
+    <a href="playground.html#unique-paths">Unique Paths</a>
+    <a href="playground.html#longest-common-subsequence">Longest Common Subsequence</a>
+  </td>
+</tr>
+
+<tr>
+  <td class="c-pattern">DP – Memoization (Top-Down)</td>
+  <td class="c-goal">Optimal / count / reachability over overlapping subproblems</td>
+  <td class="c-ds">Array / Map (cache)</td>
+  <td class="c-algo">Naive recursion — <span class="mono">O(2ⁿ)</span></td>
+  <td class="c-opt">Recurse + cache each state — <span class="mono">O(#states × work)</span></td>
+  <td><ol>
+    <li>Express the answer as a recursion on a clear state.</li>
+    <li>Before computing a state, check the cache; after computing, store it.</li>
+    <li>Return the cached result on any repeat call.</li>
+  </ol></td>
+  <td><ol>
+    <li>Overlapping subproblems are solved once and then reused.</li>
+    <li>Top-down only ever visits the states actually reachable from the target.</li>
+  </ol></td>
+  <td class="c-q">
+    <a href="playground.html#coin-change">Coin Change</a>
+    <a href="playground.html#house-robber">House Robber</a>
+    <a href="playground.html#word-break">Word Break</a>
+    <a href="playground.html#climbing-stairs">Climbing Stairs</a>
+  </td>
+</tr>
+
+</tbody>
+</table>
+</div>
+
+<p class="footer"><a href="index.html">← Back to overview</a></p>
+</div>
+
+<script>
+// Turn the Data structure cells into Notion-style colored pills.
+(function () {
+  const dsColors = {
+    "Array":       { c: "#7cc4ff", b: "rgba(92,200,255,.13)",  br: "rgba(92,200,255,.40)" },
+    "String":      { c: "#8ce99a", b: "rgba(126,231,135,.13)", br: "rgba(126,231,135,.40)" },
+    "Hash Map":    { c: "#cfa8f5", b: "rgba(199,146,234,.15)", br: "rgba(199,146,234,.40)" },
+    "Linked List": { c: "#ffc06a", b: "rgba(255,180,84,.13)",  br: "rgba(255,180,84,.40)" },
+    "Graph":       { c: "#5fd5be", b: "rgba(78,201,176,.13)",  br: "rgba(78,201,176,.40)" },
+    "Stack":       { c: "#ff9d9d", b: "rgba(255,138,138,.13)", br: "rgba(255,138,138,.40)" },
+    "Tree":        { c: "#b6e85a", b: "rgba(166,226,46,.13)",  br: "rgba(166,226,46,.40)" },
+    "Queue":       { c: "#e4e4b0", b: "rgba(220,220,170,.13)", br: "rgba(220,220,170,.40)" },
+    "Trie":        { c: "#6fdce4", b: "rgba(86,212,221,.13)",  br: "rgba(86,212,221,.40)" },
+    "Union-Find":  { c: "#f79a85", b: "rgba(244,135,113,.13)", br: "rgba(244,135,113,.40)" },
+    "Heap":        { c: "#b08bff", b: "rgba(155,109,255,.15)", br: "rgba(155,109,255,.40)" },
+    "Matrix":      { c: "#9bb6ff", b: "rgba(130,170,255,.13)", br: "rgba(130,170,255,.40)" },
+  };
+  const fallback = { c: "var(--muted)", b: "var(--panel-2)", br: "var(--border)" };
+
+  for (const cell of document.querySelectorAll("td.c-ds")) {
+    // Strip a trailing parenthetical note, then split on commas into pills.
+    const raw = cell.textContent.replace(/\s*\(.*?\)\s*$/, "");
+    const note = cell.textContent.slice(raw.length);
+    const items = raw.split(",").map((s) => s.trim()).filter(Boolean);
+    cell.textContent = "";
+    for (const name of items) {
+      const col = dsColors[name] || fallback;
+      const pill = document.createElement("span");
+      pill.className = "pill";
+      pill.textContent = name;
+      pill.style.color = col.c;
+      pill.style.background = col.b;
+      pill.style.borderColor = col.br;
+      cell.appendChild(pill);
+    }
+    if (note.trim()) {
+      const span = document.createElement("span");
+      span.style.color = "var(--muted)";
+      span.style.fontSize = "12px";
+      span.textContent = " " + note.trim();
+      cell.appendChild(span);
+    }
+  }
+})();
+</script>
+</body>
+</html>

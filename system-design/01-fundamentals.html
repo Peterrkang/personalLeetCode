@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Fundamentals</title>
+<link rel="stylesheet" href="../study-plan/style.css">
+</head>
+<body>
+<nav><div class="inner">
+  <span class="brand">📚 Prep Plan</span>
+  <a href="../study-plan/index.html">Overview</a>
+  <a href="../study-plan/system-design-curriculum.html">SD Curriculum</a>
+  <a href="index.html" class="active">SD Notes</a>
+  <a href="../study-plan/dsa-patterns.html">Patterns</a>
+  <a href="../study-plan/algo-templates.html">Boiler Plate</a>
+  <a href="../study-plan/js-ts-cheatsheet.html">JS Cheatsheet</a>
+  <a href="../study-plan/playground.html">Playground</a>
+</div></nav>
+<div class="wrap">
+
+<p class="subtitle"><a href="index.html">← All topics</a></p>
+<h1>Week 1 — System Design Fundamentals</h1>
+<p class="subtitle">The vocabulary and mental models everything else builds on. By end of week: reason about scale, name the core tradeoff (consistency vs availability vs latency vs cost), and do back-of-envelope math without panicking.</p>
+
+<h2>1. Latency vs Throughput</h2>
+<ul>
+<li><strong>Latency</strong> = time for one operation (e.g. 50 ms per request). What a single user <em>feels</em>.</li>
+<li><strong>Throughput</strong> = operations per unit time (e.g. 10,000 requests/sec). What the <em>system</em> sustains.</li>
+<li>Related but distinct: you can lower latency AND raise throughput. Batching often <em>increases</em> throughput at the cost of latency.</li>
+<li><strong>Goal:</strong> minimize latency, maximize throughput — but they trade off, so optimize for the requirement.</li>
+</ul>
+
+<h2>2. Availability — "the nines"</h2>
+<p>Availability = % of time the system is up and serving correctly.</p>
+<table>
+<tr><th>Availability</th><th>Downtime / year</th><th>Downtime / day</th></tr>
+<tr><td>99% (two nines)</td><td>3.65 days</td><td>14.4 min</td></tr>
+<tr><td>99.9% (three nines)</td><td>8.77 hrs</td><td>1.44 min</td></tr>
+<tr><td>99.99% (four nines)</td><td>52.6 min</td><td>8.6 sec</td></tr>
+<tr><td>99.999% (five nines)</td><td>5.26 min</td><td>0.86 sec</td></tr>
+</table>
+<ul>
+<li>Achieved via <strong>redundancy</strong> (no single point of failure), <strong>replication</strong>, <strong>failover</strong>, and <strong>health checks</strong>.</li>
+<li><strong>Reliability</strong> (correct results / no failures) is related but not the same as availability (is it up).</li>
+<li><strong>SLA / SLO / SLI:</strong> SLA = the promise to customers (often with penalties); SLO = your internal target; SLI = the actual measured metric.</li>
+</ul>
+
+<h2>3. Scaling</h2>
+<ul>
+<li><strong>Vertical (scale up):</strong> bigger machine. Simple, but a hard ceiling and a single point of failure.</li>
+<li><strong>Horizontal (scale out):</strong> more machines behind a load balancer. Near-unlimited, but adds coordination, partitioning, and consistency challenges.</li>
+<li><strong>Stateless services</strong> scale horizontally easily — any instance handles any request. Push state to a shared store. <strong>Stateful services</strong> are harder and need sticky sessions or careful partitioning.</li>
+<li>Rule of thumb: keep app servers stateless; push state down to databases/caches/queues.</li>
+</ul>
+
+<h2>4. Latency numbers worth knowing (orders of magnitude)</h2>
+<table>
+<tr><th>Operation</th><th>Approx time</th></tr>
+<tr><td>L1 cache reference</td><td>~1 ns</td></tr>
+<tr><td>Main memory (RAM) reference</td><td>~100 ns</td></tr>
+<tr><td>Read 1 MB sequentially from memory</td><td>~10 µs</td></tr>
+<tr><td>SSD random read</td><td>~100 µs</td></tr>
+<tr><td>Read 1 MB from SSD</td><td>~1 ms</td></tr>
+<tr><td>Round trip within same datacenter</td><td>~0.5 ms</td></tr>
+<tr><td>Disk (HDD) seek</td><td>~10 ms</td></tr>
+<tr><td>Round trip CA ↔ Netherlands</td><td>~150 ms</td></tr>
+</table>
+<p>Takeaways: <strong>memory is ~100,000× faster than disk seeks</strong>; <strong>network round trips are expensive</strong> — minimize them; stay in the same region; cache aggressively.</p>
+
+<h2>5. Back-of-the-envelope estimation</h2>
+<p>A repeatable recipe:</p>
+<ol>
+<li><strong>Users:</strong> DAU (daily active users).</li>
+<li><strong>QPS:</strong> actions/user/day × DAU ÷ 86,400 sec. Then <strong>peak QPS ≈ 2–3× average</strong>.</li>
+<li><strong>Storage:</strong> items/day × bytes/item × retention. Add a multiplier for replication (×3 common).</li>
+<li><strong>Bandwidth:</strong> QPS × bytes/response.</li>
+</ol>
+<p>Handy constants:</p>
+<ul>
+<li>1 day ≈ <strong>86,400 sec</strong> (≈ 10<sup>5</sup>).</li>
+<li>Powers of 10: KB 10<sup>3</sup>, MB 10<sup>6</sup>, GB 10<sup>9</sup>, TB 10<sup>12</sup>, PB 10<sup>15</sup>.</li>
+<li>1 char ≈ 1 byte (ASCII); a tweet ≈ 280 bytes; a small image ≈ 200 KB–1 MB.</li>
+</ul>
+
+<div class="card">
+<h3>Worked example — 100M DAU, each posts 2 items/day</h3>
+<ul>
+<li>Writes/day = 100M × 2 = 200M.</li>
+<li>Avg write QPS = 200M ÷ 86,400 ≈ <strong>~2,300 writes/sec</strong>. Peak ≈ <strong>~5,000–7,000/sec</strong>.</li>
+<li>If each item ≈ 1 KB: storage/day = 200M × 1 KB = <strong>200 GB/day</strong> → ~73 TB/year (×3 replication ≈ <strong>~220 TB/year</strong>).</li>
+<li>If reads are 100× writes (typical social): read QPS ≈ 230k/sec → you'll need caching + read replicas.</li>
+</ul>
+</div>
+
+<h2>The interview framework (memorize, use every time)</h2>
+<ol>
+<li><strong>Clarify</strong> functional + non-functional requirements (scale, latency, consistency, availability, read/write ratio).</li>
+<li><strong>Estimate</strong> QPS, storage, bandwidth.</li>
+<li><strong>API design</strong> — core endpoints.</li>
+<li><strong>High-level design</strong> — clients → load balancer → services → DB / cache / queue.</li>
+<li><strong>Deep dive</strong> into 1–2 components.</li>
+<li><strong>Bottlenecks &amp; tradeoffs</strong> — what breaks at 10×, how to scale and recover.</li>
+</ol>
+
+<div class="callout">
+<strong>Exercise (do it on paper, then check yourself):</strong> Estimate QPS (avg + peak), storage/year, and read bandwidth for a photo-sharing service with <strong>50M DAU</strong>, each uploading <strong>1 photo/day</strong> (avg 1.5 MB) and viewing <strong>50 photos/day</strong>.
+</div>
+
+<h2>Self-check</h2>
+<div class="card">
+<ul>
+<li>Can I explain latency vs throughput with an example?</li>
+<li>Do I know what "four nines" means in downtime?</li>
+<li>When do I scale vertically vs horizontally?</li>
+<li>Why are app servers usually stateless?</li>
+<li>Can I do a QPS + storage estimate in under 5 minutes?</li>
+<li>Can I recite the 6-step framework from memory?</li>
+</ul>
+</div>
+
+<p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
+</div>
+</body>
+</html>

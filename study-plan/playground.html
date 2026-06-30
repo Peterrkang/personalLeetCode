@@ -342,10 +342,10 @@
   #toolbar .spacer { flex: 1; }
   button {
     font-family: inherit;
-    font-size: 13px;
+    font-size: 12.5px;
     border: none;
     border-radius: 5px;
-    padding: 7px 16px;
+    padding: 6px 12px;
     cursor: pointer;
     color: #fff;
     background: var(--accent);
@@ -367,16 +367,30 @@
   #editor-wrap { flex: 1; position: relative; min-height: 0; }
   /* #editor hosts the CodeMirror 6 EditorView (see the editor setup in JS). */
 
-  /* Solution tabs (extra-solutions pages) */
+  /* Solution tabs (extra-solutions pages) + inline actions */
+  #tabbar {
+    display: flex;
+    align-items: stretch;
+    background: var(--panel2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
   #tabs {
     display: flex;
     align-items: stretch;
     gap: 2px;
     padding: 0 8px;
-    background: var(--panel2);
-    border-bottom: 1px solid var(--border);
     overflow-x: auto;
+    flex: 1;
+    min-width: 0;
+  }
+  .tab-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
     flex-shrink: 0;
+    border-left: 1px solid var(--border);
   }
   #tabs::-webkit-scrollbar { height: 6px; }
   #tabs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -645,14 +659,18 @@
     <div id="toolbar">
       <button id="sidebar-toggle" class="icon-btn" title="Toggle sidebar (problem list)">☰</button>
       <a id="back-to-problems" href="index.html" title="Back to the weekly problems list">📚 Overview</a>
-      <button id="run-btn">▶ Run (Ctrl+Enter)</button>
-      <button id="reset-btn" class="secondary">Reset</button>
-      <button id="explain-btn" class="ai" title="Explain the selected lines (or whole solution) with Claude — Shift+Ctrl+E">✦ Explain</button>
       <span class="spacer"></span>
       <button id="key-btn" class="icon-btn" title="Set Anthropic API key">🔑</button>
       <span class="hint">Code auto-saves locally</span>
     </div>
-    <div id="tabs" title="Solution pages — keep multiple approaches per problem"></div>
+    <div id="tabbar">
+      <div id="tabs" title="Solution pages — keep multiple approaches per problem"></div>
+      <div class="tab-actions">
+        <button id="run-btn" title="Run (Ctrl+Enter)">▶ Run</button>
+        <button id="reset-btn" class="secondary">Reset</button>
+        <button id="explain-btn" class="ai" title="Explain the selected lines (or whole solution) with Claude — Shift+Ctrl+E">✦ Explain</button>
+      </div>
+    </div>
     <div id="editor-wrap">
       <div id="editor"></div>
       <div id="explain-panel">
@@ -1077,7 +1095,6 @@ const esLintExtension = linter((view) => {
       }
 
       tab.onclick = () => selectPage(page.pid);
-      tab.ondblclick = () => renamePage(page.pid);
       tabsEl.appendChild(tab);
     });
 
@@ -1105,8 +1122,7 @@ const esLintExtension = linter((view) => {
     saveCurrent();
     const pages = getPages(currentId);
     const pid = "p" + Date.now().toString(36);
-    const name = (prompt("Name this solution page:", `Solution ${pages.length + 1}`) || "").trim()
-      || `Solution ${pages.length + 1}`;
+    const name = `Solution ${pages.length + 1}`;
     pages.push({ pid, name });
     setPages(currentId, pages);
     const p = PROBLEMS.find((x) => x.id === currentId);
@@ -1119,22 +1135,10 @@ const esLintExtension = linter((view) => {
     cm.focus();
   }
 
-  function renamePage(pid) {
-    const pages = getPages(currentId);
-    const page = pages.find((x) => x.pid === pid);
-    if (!page) return;
-    const name = prompt("Rename solution page:", page.name);
-    if (name === null) return;
-    page.name = name.trim() || page.name;
-    setPages(currentId, pages);
-    renderTabs();
-  }
 
   function deletePage(pid) {
     const pages = getPages(currentId);
     if (pages.length <= 1) return;
-    const page = pages.find((x) => x.pid === pid);
-    if (!confirm(`Delete "${page ? page.name : "this page"}"? Its code will be lost.`)) return;
     const idx = pages.findIndex((x) => x.pid === pid);
     pages.splice(idx, 1);
     setPages(currentId, pages);

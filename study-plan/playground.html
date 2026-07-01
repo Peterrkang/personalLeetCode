@@ -1658,26 +1658,21 @@ const esLintExtension = linter((view) => {
 
     const snippet = selection.trim() || full;
     openExplainPanel(snippet);
-    clearPlaceholderIfEmpty();
 
-    let userText = `Problem: ${title}\n\nMy full solution:\n\`\`\`js\n${full}\n\`\`\`\n\n`;
-    userText += selection.trim()
-      ? `Explain these selected lines from my solution:\n\`\`\`js\n${selection}\n\`\`\``
-      : `Walk me through how my whole solution works.`;
-
-    // Show a short bubble for the request so the persisted thread reads naturally.
-    const bubble = document.createElement("div");
-    bubble.className = "explain-q";
-    bubble.textContent = selection.trim()
-      ? "Explain the selected lines"
-      : "Walk me through my solution";
-    explainBody.appendChild(bubble);
-    explainBody.scrollTop = explainBody.scrollHeight;
-
-    pendingContext = "";
-    conversation.push({ role: "user", content: userText });
-    await runTurn();
-    if (currentId === sid) persistChat(sid);
+    // Don't auto-ask Claude on open. Stash the solution as context and wait for
+    // the user's own question — mirrors the no-code path above.
+    if (!conversation.some((m) => m.role === "assistant")) {
+      pendingContext = `Problem: ${title}\n\nMy full solution:\n\`\`\`js\n${full}\n\`\`\`\n\n`;
+      if (selection.trim())
+        pendingContext += `I'm asking about these selected lines:\n\`\`\`js\n${selection}\n\`\`\`\n\n`;
+      if (!conversation.length)
+        explainBody.innerHTML =
+          '<div class="explain-status">Ask Claude anything about your solution below.</div>';
+    }
+    askInput.disabled = false;
+    askBtn.disabled = false;
+    askInput.focus();
+    persistChat(sid);
   }
 
   async function askFollowUp() {

@@ -12,7 +12,7 @@ cases each. Everything lives in [study-plan/problems.js](study-plan/problems.js)
 
 - Pick a problem from the sidebar (filter by number/title, difficulty, or solved status).
 - Write your solution in the editor and press **▶ Run** (or **Ctrl+Enter**) to test it
-  against the problem's cases.
+  against the problem's cases. **Reset** restores the current page to its starter code.
 - Code, notes, and progress auto-save to your browser's `localStorage`.
 
 ## Adding a new problem
@@ -82,11 +82,14 @@ several approaches side by side (e.g. brute-force vs. optimal):
 
 ## Explain with Claude
 
-Inside the playground you can ask Claude to explain your code:
+Inside the playground you can chat with Claude about your code:
 
-1. **Select some lines** in the editor (or select nothing to explain the whole solution).
-2. Click **✦ Explain** in the toolbar, or press **Shift+Ctrl+E** (**Shift+Cmd+E** on Mac).
-3. The explanation streams into a side panel. Press **Esc** to close it.
+1. Click **✦ Explain** in the toolbar, or press **Shift+Ctrl+E** (**Shift+Cmd+E** on Mac).
+   Optionally **select some lines** first to point the conversation at them.
+2. A side panel opens with your solution stashed as context and **waits** — type your
+   question and press **Enter** to send. Nothing is sent automatically on open.
+3. The reply streams in, and you can keep asking follow-ups in the same thread. Each
+   problem keeps its own conversation, auto-saved to `localStorage`. Press **Esc** to close.
 
 The first time, you'll be asked for an [Anthropic API key](https://console.anthropic.com/).
 It's stored only in your browser's `localStorage` and sent directly to `api.anthropic.com`

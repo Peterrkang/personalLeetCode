@@ -699,7 +699,7 @@
 
 // ---------- CodeMirror 6 (editor framework) ----------
 import { basicSetup } from "codemirror";
-import { EditorState, Prec } from "@codemirror/state";
+import { EditorState, Prec, Compartment } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { indentUnit, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { indentWithTab } from "@codemirror/commands";
@@ -708,14 +708,14 @@ import { linter, lintGutter } from "@codemirror/lint";
 import { tags as t } from "@lezer/highlight";
 
 // ---------- ESLint (real linter, loaded from a CDN) ----------
-// Loaded optionally: if the CDN is unreachable the editor still works, just
-// without live linting.
+// Loaded lazily and *without* blocking: a top-level `await` here would stall
+// the whole module — and therefore the editor's first paint — behind the
+// ESLint download. Instead we kick the import off after the editor mounts and
+// switch linting on via a compartment once it resolves (see the loader below).
+// Pinned to an exact version so esm.sh serves a directly cacheable URL rather
+// than doing a `@latest` resolution redirect on every load.
+const ESLINT_URL = "https://esm.sh/eslint-linter-browserify@10.6.0";
 let Linter = null;
-try {
-  ({ Linter } = await import("https://esm.sh/eslint-linter-browserify@latest"));
-} catch (err) {
-  console.warn("ESLint failed to load — linting disabled.", err);
-}
 
 const GLOBAL_NAMES = [
   // ES built-ins
@@ -759,7 +759,10 @@ const ESLINT_CONFIG = {
   },
 };
 
-const eslint = Linter ? new Linter() : null;
+// Populated once ESLint finishes loading. The lint extension is
+// held in a compartment so it can be swapped in after the editor is created.
+let eslint = null;
+const lintCompartment = new Compartment();
 
 // CM6 linter extension: runs ESLint and maps its 1-based line/column messages
 // onto absolute document offsets (the unit CM6 diagnostics use).
@@ -876,7 +879,7 @@ const esLintExtension = linter((view) => {
         EditorState.tabSize.of(2),
         monokaiProTheme,
         Prec.highest(syntaxHighlighting(monokaiProHighlight)),
-        eslint ? [esLintExtension, lintGutter()] : [],
+        lintCompartment.of([]),   // linting added once ESLint loads
         Prec.highest(keymap.of([
           { key: "Mod-Enter", preventDefault: true, run: () => { run(); return true; } },
           { key: "Shift-Mod-e", preventDefault: true, run: () => { explain(); return true; } },
@@ -888,6 +891,21 @@ const esLintExtension = linter((view) => {
       ],
     }),
   });
+
+  // Load ESLint in the background (the editor is already interactive above) and
+  // enable live linting once it arrives. If the CDN is unreachable the editor
+  // just keeps working without linting.
+  (async () => {
+    try {
+      ({ Linter } = await import(ESLINT_URL));
+      eslint = new Linter();
+      view.dispatch({
+        effects: lintCompartment.reconfigure([esLintExtension, lintGutter()]),
+      });
+    } catch (err) {
+      console.warn("ESLint failed to load — linting disabled.", err);
+    }
+  })();
 
   // Adapter: exposes the CM5 method surface the rest of the app already calls,
   // backed by the CM6 EditorView.

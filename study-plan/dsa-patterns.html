@@ -206,6 +206,8 @@
     <li>Build <span class="mono">prefix[i]</span> = sum of the first i elements.</li>
     <li>Any range sum (i, j) = <span class="mono">prefix[j] − prefix[i]</span>.</li>
     <li>For "subarray sums to K", store counts of seen prefixes in a map and look up <span class="mono">prefix − K</span>.</li>
+    <li>For "2d Matrix sums", use padding row/col for cleaner implementation.</li>
+
   </ol></td>
   <td><ol>
     <li>A range sum reuses two precomputed numbers instead of re-adding the whole range.</li>

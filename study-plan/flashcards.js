@@ -9,8 +9,8 @@
  *   q      front (question) — may contain inline HTML (e.g. <code>)
  *   a      back (answer)    — may contain inline HTML
  *
- * Mirrors the facts in dsa-patterns.html, algo-templates.html and
- * js-ts-cheatsheet.html — keep them in sync if you edit one.
+ * Mirrors the facts in patterns.html, templates.html and
+ * cheatsheet.html — keep them in sync if you edit one.
  */
 const CARDS = [
   // ---- Complexity ----

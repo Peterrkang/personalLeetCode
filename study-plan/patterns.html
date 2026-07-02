@@ -87,6 +87,15 @@
     padding: 1px 9px; margin: 1px 3px 1px 0;
     border-radius: 999px; border: 1px solid var(--border); white-space: nowrap;
   }
+
+  /* Inline-editable cells (Optimization details + Rationale) */
+  td.editable { cursor: text; transition: background 0.12s, box-shadow 0.12s; }
+  td.editable:hover { background: rgba(92, 200, 255, 0.05); }
+  td.editable:focus {
+    outline: none; background: rgba(92, 200, 255, 0.08);
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+  td.editable.edited { box-shadow: inset 3px 0 0 var(--accent); }
 </style>
 </head>
 <body>
@@ -95,9 +104,9 @@
   <a href="index.html">Overview</a>
   <a href="system-design-curriculum.html">SD Curriculum</a>
   <a href="../system-design/index.html">SD Notes</a>
-  <a href="dsa-patterns.html" class="active">Patterns</a>
-  <a href="algo-templates.html">Boiler Plate</a>
-  <a href="js-ts-cheatsheet.html">JS Cheatsheet</a>
+  <a href="patterns.html" class="active">Patterns</a>
+  <a href="templates.html">Templates</a>
+  <a href="cheatsheet.html">JS Cheatsheet</a>
   <a href="flashcards.html">Flashcards</a>
   <a href="playground.html">Playground</a>
 </div></nav>
@@ -115,7 +124,7 @@
   <th>Pattern</th>
   <th>Problem goal</th>
   <th>Data structure</th>
-  <th>Algorithm (brute force)</th>
+  <th>Brute Force</th>
   <th>Optimization</th>
   <th>Optimization details</th>
   <th>Rationale</th>
@@ -579,6 +588,47 @@
       span.style.fontSize = "12px";
       span.textContent = " " + note.trim();
       cell.appendChild(span);
+    }
+  }
+})();
+
+// Make the "Optimization details" and "Rationale" cells editable in place,
+// persisting any changes to localStorage keyed by pattern name + column.
+(function () {
+  const STORE_KEY = "dsa-patterns-edits";
+  const COLUMNS = { "c-details": "details", "c-rat": "rationale" };
+
+  let store;
+  try {
+    store = JSON.parse(localStorage.getItem(STORE_KEY)) || {};
+  } catch {
+    store = {};
+  }
+  const save = () => localStorage.setItem(STORE_KEY, JSON.stringify(store));
+
+  for (const row of document.querySelectorAll(".patterns tbody tr")) {
+    const pattern = row.querySelector(".c-pattern")?.textContent.trim();
+    if (!pattern) continue;
+
+    for (const [cls, colKey] of Object.entries(COLUMNS)) {
+      const cell = row.querySelector(`td.${cls}`);
+      if (!cell) continue;
+
+      const key = `${pattern} ${colKey}`;
+      if (typeof store[key] === "string") {
+        cell.innerHTML = store[key];
+      }
+
+      cell.contentEditable = "true";
+      cell.spellcheck = false;
+      cell.classList.add("editable");
+      if (store[key] != null) cell.classList.add("edited");
+
+      cell.addEventListener("input", () => {
+        store[key] = cell.innerHTML;
+        cell.classList.add("edited");
+        save();
+      });
     }
   }
 })();

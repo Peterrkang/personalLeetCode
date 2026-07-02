@@ -2,7 +2,7 @@
  * Problem bank for the in-browser playground (playground.html).
  *
  * Each problem deep-links at playground.html#<id>, and the set mirrors the
- * question list in dsa-patterns.html. Edit problems here directly.
+ * question list in patterns.html. Edit problems here directly.
  *
  *   id          unique slug, also the URL hash
  *   fnName      the function your code must define

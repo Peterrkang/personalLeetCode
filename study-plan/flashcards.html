@@ -73,6 +73,41 @@
 .kbd { display: inline-block; font-family: "SF Mono", Consolas, Monaco, monospace; font-size: 12px; background: var(--panel-2); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text); }
 .fc-legend { color: var(--muted); font-size: 13px; margin: 8px 0; }
 .fc-legend .kbd { margin: 0 2px; }
+
+/* ---- "Which pattern?" decision guide (collapsible reference) ---- */
+.guide { margin: 22px 0; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); overflow: hidden; }
+.guide > summary {
+  cursor: pointer; list-style: none; padding: 14px 18px;
+  font-size: 15px; font-weight: 600; color: #fff;
+  display: flex; align-items: center; gap: 8px;
+}
+.guide > summary::-webkit-details-marker { display: none; }
+.guide > summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+.guide[open] > summary::before { transform: rotate(90deg); }
+.guide > summary .sub { color: var(--muted); font-weight: 400; font-size: 13px; }
+.guide-body { padding: 4px 18px 20px; }
+.guide-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.gcard { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px; font-size: 13px; line-height: 1.55; }
+.gcard h3 { font-size: 14px; margin: 0 0 8px; color: #fff; }
+.gcard h3 .when { color: var(--muted); font-weight: 400; }
+.gcard ul { margin: 0 0 8px; padding-left: 18px; }
+.gcard li { margin: 3px 0; }
+.gcard .tell { display: block; border-top: 1px dashed var(--border); padding-top: 8px; color: var(--muted); font-size: 12.5px; }
+.gcard .tell b { color: var(--accent); font-weight: 600; }
+.gcard.tp { border-top: 3px solid #7cc4ff; }
+.gcard.sw { border-top: 3px solid #8ce99a; }
+.gcard.ps { border-top: 3px solid #cfa8f5; }
+.gcard code { background: rgba(0,0,0,0.3); font-family: "SF Mono", Consolas, Monaco, monospace; font-size: 12px; }
+.litmus { background: var(--panel-2); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 12px 16px; font-size: 13px; line-height: 1.6; margin-bottom: 14px; }
+.litmus b { color: var(--accent); }
+.litmus code { background: rgba(0,0,0,0.3); font-family: "SF Mono", Consolas, Monaco, monospace; font-size: 12px; }
+.signals table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; font-size: 13px; }
+.signals th, .signals td { text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--border); }
+.signals tr:last-child td { border-bottom: none; }
+.signals th { background: var(--panel-2); color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.signals td:first-child { color: var(--text); width: 55%; }
+.signals td:last-child { color: var(--accent); font-weight: 600; }
+.signals h3 { font-size: 14px; margin: 4px 0 10px; color: #fff; }
 </style>
 </head>
 <body>
@@ -141,6 +176,75 @@
   <b>✓ Got it</b> promotes a card one box; <b>✗ Again</b> sends it back to box 1. A card counts as <em>mastered</em> at box 5.
   Progress is saved in your browser, per card.
 </div>
+
+<details class="guide">
+  <summary>Which pattern? <span class="sub">— Two Pointers vs Sliding Window vs Prefix Sum, and signal words</span></summary>
+  <div class="guide-body">
+    <p class="fc-legend">All three walk an array with indices, so problems look alike. Pick by what the <em>answer</em> is and whether the constraint is monotonic.</p>
+
+    <div class="guide-cards">
+      <div class="gcard tp">
+        <h3>Two Pointers <span class="when">— answer is a pair / tuple</span></h3>
+        <ul>
+          <li>Input is <strong>sorted</strong> (or you can sort without breaking the answer).</li>
+          <li>Comparing the two end values proves which pointer is <em>safe to move</em> — one comparison discards all pairs on one side.</li>
+          <li>Pointers move <strong>toward each other</strong>; you're picking elements, not a range.</li>
+        </ul>
+        <span class="tell"><b>Tells:</b> "sorted", "find a pair/triplet", "two ends", palindromes, in-place partition.</span>
+      </div>
+
+      <div class="gcard sw">
+        <h3>Sliding Window <span class="when">— answer is the best contiguous run</span></h3>
+        <ul>
+          <li>"<strong>Longest / shortest / max</strong> subarray or substring such that…"</li>
+          <li>Constraint is <strong>monotonic</strong>: growing only violates more, shrinking only fixes (all-positive sums, distinct-char counts, "at most K").</li>
+          <li>Both pointers move the <strong>same direction</strong>; a running state is updated incrementally.</li>
+        </ul>
+        <span class="tell"><b>Tells:</b> "longest substring without…", "minimum window containing…", "at most K distinct".</span>
+      </div>
+
+      <div class="gcard ps">
+        <h3>Prefix Sum <span class="when">— answer counts / sums ranges exactly</span></h3>
+        <ul>
+          <li>"How many subarrays sum to <strong>exactly K</strong>", or many repeated <strong>range-sum queries</strong>.</li>
+          <li>Works where a window breaks: <strong>negatives</strong> or exact targets, since <code>sum(i,j)=prefix[j]−prefix[i]</code> needs no monotonicity.</li>
+          <li>Pair with a <strong>hash map</strong> of seen prefixes → find <code>current−K</code> in O(1).</li>
+        </ul>
+        <span class="tell"><b>Tells:</b> "sum equals K", "count the subarrays", "equal 0s and 1s", static array + many queries.</span>
+      </div>
+    </div>
+
+    <div class="litmus">
+      <b>10-second litmus test:</b> "If I extend the window by one element, does the constraint <em>always</em> move one direction?"
+      <b>Yes</b> (all-positive sum grows, distinct count never drops) → <b>sliding window</b>.
+      <b>No</b> (negatives, or target is <code>== K</code> not <code>≤ K</code>) → <b>prefix sum + hash map</b>.
+      If it's about <em>which elements</em> rather than <em>which range</em> and sorted order helps → <b>two pointers</b>.
+      Examples: "longest subarray, sum ≤ K, all positive" = window; "count subarrays, sum == K, negatives" = prefix sum; "two numbers add to K, sorted" = two pointers.
+    </div>
+
+    <div class="signals">
+      <h3>Signal words → pattern</h3>
+      <table>
+        <thead><tr><th>The problem says…</th><th>Reach for</th></tr></thead>
+        <tbody>
+          <tr><td>"Cycle in a linked list", "middle of the list", O(1) space on a list</td><td>Fast &amp; Slow Pointers</td></tr>
+          <tr><td>"Sorted" + find a value, or "minimum X that works" (monotonic yes/no)</td><td>Binary Search</td></tr>
+          <tr><td>"Kth largest / smallest", "top K", "K closest", streaming median</td><td>Heap / Quickselect</td></tr>
+          <tr><td>"Next greater / previous smaller element", spans, histogram areas</td><td>Monotonic Stack</td></tr>
+          <tr><td>Overlapping ranges, "merge / insert intervals", meeting rooms</td><td>Merge Intervals (sort + sweep)</td></tr>
+          <tr><td>"All subsets / permutations / combinations", "generate every valid…"</td><td>Backtracking</td></tr>
+          <tr><td>Explore a whole region or path — islands, connected areas, tree paths</td><td>DFS</td></tr>
+          <tr><td>"Shortest path" / "minimum steps" in an unweighted graph or grid</td><td>BFS</td></tr>
+          <tr><td>"Shortest path" with non-negative edge weights</td><td>Dijkstra</td></tr>
+          <tr><td>"Prerequisites", "build order", dependencies in a DAG</td><td>Topological Sort</td></tr>
+          <tr><td>"Are these connected?", grouping / merging accounts, undirected cycle</td><td>Union-Find</td></tr>
+          <tr><td>"Starts with", prefix search, autocomplete over a dictionary</td><td>Trie</td></tr>
+          <tr><td>"Max / min / count the ways", choices with overlapping subproblems</td><td>DP (memo or tabulation)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</details>
 
 <script src="flashcards.js"></script>
 </body>

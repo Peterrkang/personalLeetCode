@@ -306,6 +306,29 @@
     letter-spacing: 0.5px;
   }
   #description .approach .approach-sep { color: var(--muted); }
+  #description .approach.hidden { display: none; }
+
+  /* Reveal button for the approach/hint */
+  #description .hint-btn {
+    margin-top: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 13px;
+    background: rgba(78, 201, 176, 0.07);
+    color: var(--green);
+    border: 1px solid var(--green);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  #description .hint-btn:hover { background: rgba(78, 201, 176, 0.16); }
+  #description .hint-btn.revealed { display: none; }
 
   /* Per-problem notes */
   #notes-section { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 14px; }
@@ -1137,6 +1160,7 @@ const esLintExtension = linter((view) => {
       `<textarea id="notes-area" spellcheck="false" ` +
       `placeholder="Approach, pattern, gotchas, what tripped you up, complexity…"></textarea>` +
       `</div>`;
+    wireApproachHint();
     wireNotes(id);
     cm.setValue(savedCode(id, currentPid) ?? p.starter);
     resultsEl.innerHTML = '<div class="summary hint">Write your solution, then Run.</div>';
@@ -1242,6 +1266,21 @@ const esLintExtension = linter((view) => {
   // ---------- per-problem notes ----------
   // The textarea is recreated with the description on every problem switch, so
   // (re)load its saved value and attach a debounced autosave each time.
+  // Hide the approach callout behind a button so the hint isn't spoiled on load.
+  function wireApproachHint() {
+    const approach = descEl.querySelector(".approach");
+    if (!approach) return;
+    approach.classList.add("hidden");
+    const btn = document.createElement("button");
+    btn.className = "hint-btn";
+    btn.textContent = "💡 Show approach";
+    btn.addEventListener("click", () => {
+      approach.classList.remove("hidden");
+      btn.classList.add("revealed");
+    });
+    approach.parentNode.insertBefore(btn, approach);
+  }
+
   function wireNotes(id) {
     const ta = document.getElementById("notes-area");
     const savedTag = document.getElementById("notes-saved");

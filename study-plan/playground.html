@@ -624,6 +624,53 @@
     background: linear-gradient(135deg, #6e56cf, #9b6dff);
   }
   #explain-ask button:disabled { opacity: 0.5; cursor: default; }
+
+  /* ---------- Reference-solution modal ---------- */
+  #solution-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4vh 16px;
+    background: rgba(0, 0, 0, 0.55);
+  }
+  #solution-overlay[hidden] { display: none; }
+  #solution-modal {
+    display: flex;
+    flex-direction: column;
+    width: 780px;
+    max-width: 100%;
+    max-height: 92vh;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+  }
+  #solution-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel2);
+  }
+  #solution-head h3 { margin: 0; font-size: 13.5px; flex: 1; font-weight: 600; }
+  #solution-head .solution-icon { font-size: 15px; }
+  #solution-code {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    background: #2d2a2e;
+  }
+  #solution-code .cm-editor { height: 100%; }
+  #solution-foot {
+    padding: 9px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--panel2);
+  }
 </style>
 </head>
 <body>
@@ -658,7 +705,7 @@
   <div id="main">
     <div id="toolbar">
       <button id="sidebar-toggle" class="icon-btn" title="Toggle sidebar (problem list)">☰</button>
-      <a id="back-to-problems" href="index.html" title="Back to the weekly problems list">📚 Overview</a>
+      <a id="back-to-problems" href="patterns.html" title="Back to the weekly problems list">📚 Problems</a>
       <span class="spacer"></span>
       <button id="key-btn" class="icon-btn" title="Set Anthropic API key">🔑</button>
       <span class="hint">Code auto-saves locally</span>
@@ -668,6 +715,7 @@
       <div class="tab-actions">
         <button id="run-btn" title="Run (Ctrl+Enter)">▶ Run</button>
         <button id="reset-btn" class="secondary">Reset</button>
+        <button id="solution-btn" class="secondary" title="See a reference solution for this problem">💡 Solution</button>
         <button id="explain-btn" class="ai" title="Explain the selected lines (or whole solution) with Claude — Shift+Ctrl+E">✦ Explain</button>
       </div>
     </div>
@@ -692,7 +740,24 @@
     </div>
   </div>
 
+  <div id="solution-overlay" hidden>
+    <div id="solution-modal" role="dialog" aria-modal="true" aria-labelledby="solution-title">
+      <div id="solution-head">
+        <span class="solution-icon">💡</span>
+        <h3 id="solution-title">Reference solution</h3>
+        <button id="solution-copy" class="secondary" title="Copy the solution to your clipboard">Copy</button>
+        <button id="solution-load" class="secondary" title="Open this solution on a new page in the editor">Open in editor</button>
+        <button id="solution-close" class="icon-btn" title="Close (Esc)">✕</button>
+      </div>
+      <div id="solution-code"></div>
+      <div id="solution-foot">
+        <span class="hint">Read-only — your own code is untouched. “Open in editor” copies it into a new solution page.</span>
+      </div>
+    </div>
+  </div>
+
 <script src="problems.js"></script>
+<script src="solutions.js"></script>
 
 <script type="module">
 "use strict";
@@ -1077,6 +1142,7 @@ const esLintExtension = linter((view) => {
     resultsEl.innerHTML = '<div class="summary hint">Write your solution, then Run.</div>';
     renderTabs();
     renderList();
+    refreshSolutionBtn();
     cm.focus();
     // Keep the URL in sync so a problem is shareable/deep-linkable (e.g. index.html#two-sum).
     if (location.hash.slice(1) !== id) history.replaceState(null, "", "#" + id);
@@ -1393,6 +1459,102 @@ const esLintExtension = linter((view) => {
 
   runBtn.onclick = run;
   resetBtn.onclick = reset;
+
+  // ---------- reference solution modal ----------
+  const solutionBtn = document.getElementById("solution-btn");
+  const solutionOverlay = document.getElementById("solution-overlay");
+  const solutionTitle = document.getElementById("solution-title");
+  const solutionClose = document.getElementById("solution-close");
+  const solutionCopy = document.getElementById("solution-copy");
+  const solutionLoad = document.getElementById("solution-load");
+  const solutionCodeEl = document.getElementById("solution-code");
+  // The read-only viewer is created lazily on first open, then reused. It shares
+  // the editor's Monokai theme + highlighting so solutions look like the editor.
+  let solutionView = null;
+  const currentSolution = () =>
+    (typeof SOLUTIONS !== "undefined" && SOLUTIONS[currentId]) || null;
+
+  function setSolutionCode(text) {
+    if (!solutionView) {
+      solutionView = new EditorView({
+        parent: solutionCodeEl,
+        state: EditorState.create({
+          doc: text,
+          extensions: [
+            basicSetup,
+            javascript(),
+            indentUnit.of("  "),
+            EditorState.tabSize.of(2),
+            EditorState.readOnly.of(true),
+            EditorView.editable.of(false),
+            monokaiProTheme,
+            Prec.highest(syntaxHighlighting(monokaiProHighlight)),
+          ],
+        }),
+      });
+    } else {
+      solutionView.dispatch({
+        changes: { from: 0, to: solutionView.state.doc.length, insert: text },
+      });
+    }
+  }
+
+  function openSolution() {
+    const code = currentSolution();
+    if (!code) return;
+    const p = PROBLEMS.find((x) => x.id === currentId);
+    solutionTitle.textContent = `Reference solution — ${p ? p.num + ". " + p.title : ""}`;
+    // Reveal the overlay first so the viewer measures against a visible
+    // container (CM6 lays out on creation), then load the code.
+    solutionOverlay.hidden = false;
+    setSolutionCode(code);
+    solutionView.requestMeasure();
+    solutionCopy.textContent = "Copy";
+  }
+
+  function closeSolution() { solutionOverlay.hidden = true; }
+
+  // Enable/disable the button for the active problem (all currently ship a
+  // solution, but guard so a future problem without one degrades gracefully).
+  function refreshSolutionBtn() {
+    const has = !!currentSolution();
+    solutionBtn.disabled = !has;
+    solutionBtn.title = has
+      ? "See a reference solution for this problem"
+      : "No reference solution for this problem yet";
+    solutionBtn.style.opacity = has ? "" : "0.5";
+  }
+
+  solutionBtn.onclick = openSolution;
+  solutionClose.onclick = closeSolution;
+  solutionOverlay.addEventListener("click", (e) => {
+    if (e.target === solutionOverlay) closeSolution();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !solutionOverlay.hidden) closeSolution();
+  });
+  solutionCopy.onclick = async () => {
+    const code = currentSolution();
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      solutionCopy.textContent = "Copied!";
+      setTimeout(() => { solutionCopy.textContent = "Copy"; }, 1400);
+    } catch {
+      solutionCopy.textContent = "Copy failed";
+      setTimeout(() => { solutionCopy.textContent = "Copy"; }, 1400);
+    }
+  };
+  // Drop the solution onto a fresh page so the user can run/tweak it without
+  // clobbering their own attempt.
+  solutionLoad.onclick = () => {
+    const code = currentSolution();
+    if (!code) return;
+    addPage();                                  // creates + activates a new page
+    cm.setValue(code);
+    saveCode(currentId, currentPid, code);
+    closeSolution();
+  };
 
   // ---------- Claude AI: explain selected code ----------
   const KEY_STORE = "plc:anthropic-key";

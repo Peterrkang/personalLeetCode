@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Databases</title>
+<link rel="stylesheet" href="../study-plan/style.css">
+</head>
+<body>
+<nav><div class="inner">
+  <a href="../study-plan/index.html">Overview</a>
+  <a href="../study-plan/system-design-curriculum.html">SD Curriculum</a>
+  <a href="index.html" class="active">SD Notes</a>
+  <a href="../study-plan/patterns.html">Patterns</a>
+  <a href="../study-plan/templates.html">Templates</a>
+  <a href="../study-plan/cheatsheet.html">JS Cheatsheet</a>
+  <a href="../study-plan/flashcards.html">Flashcards</a>
+  <a href="../study-plan/playground.html">Playground</a>
+</div></nav>
+<div class="wrap">
+
+<p class="subtitle"><a href="index.html">← All topics</a></p>
+<h1>Week 3 — Databases</h1>
+<p class="subtitle">The database choice is the single most consequential decision in most designs. By end of week: pick SQL vs NoSQL and justify it, explain what an index actually does, and know ACID vs BASE beyond the acronyms.</p>
+
+<h2>1. SQL vs NoSQL</h2>
+<table>
+<tr><th></th><th>Relational (Postgres, MySQL)</th><th>NoSQL</th></tr>
+<tr><td>Schema</td><td>Fixed, enforced up front</td><td>Flexible / evolving</td></tr>
+<tr><td>Queries</td><td>Rich: joins, aggregates, ad-hoc SQL</td><td>Simple, by known access pattern (usually key lookups)</td></tr>
+<tr><td>Transactions</td><td>Strong ACID</td><td>Often per-item only; BASE</td></tr>
+<tr><td>Scaling</td><td>Vertical + read replicas; sharding is manual and painful</td><td>Horizontal sharding built in</td></tr>
+<tr><td>Pick when</td><td>Relational data, complex queries, correctness first (orders, payments, inventory)</td><td>Massive scale, high write throughput, simple access patterns (feeds, sessions, events)</td></tr>
+</table>
+<p>NoSQL families: <strong>key-value</strong> (Redis, DynamoDB), <strong>document</strong> (MongoDB), <strong>wide-column</strong> (Cassandra — huge write throughput, queries by partition key), <strong>graph</strong> (Neo4j — relationship traversal).</p>
+<div class="callout tip">
+<strong>Interview default:</strong> start relational. Move a table to NoSQL when you can name the reason: write volume, size beyond one machine, or schema flexibility. "We'll use MongoDB because it's web scale" is an anti-signal; "user table stays in Postgres, activity events go to Cassandra because it's 50k writes/sec append-only" is the senior version.
+</div>
+
+<h2>2. Indexes</h2>
+<ul>
+<li>An index is a <strong>sorted copy of selected columns</strong> pointing back at the rows — usually a <strong>B-tree</strong>, so lookups and range scans are O(log n).</li>
+<li>Without one: full table scan, O(n). With one: the difference between 5 ms and 30 s on a big table.</li>
+<li><strong>Cost:</strong> every index slows <em>writes</em> (each insert/update maintains every index) and eats disk. Index the columns you filter/join/sort by — not everything.</li>
+<li><strong>Composite index</strong> on <code>(user_id, created_at)</code> serves "this user's recent items" in one walk; order matters — it can't serve a query on <code>created_at</code> alone (leftmost-prefix rule).</li>
+<li>Know the phrase <strong>covering index</strong>: if the index contains every column the query needs, the DB never touches the table.</li>
+</ul>
+
+<h2>3. ACID, transactions &amp; isolation</h2>
+<ul>
+<li><strong>Atomicity</strong> — all or nothing. <strong>Consistency</strong> — constraints hold before and after. <strong>Isolation</strong> — concurrent transactions don't see each other's partial work. <strong>Durability</strong> — committed means survives a crash (write-ahead log).</li>
+<li>Isolation levels trade correctness for speed: <em>read uncommitted → read committed → repeatable read → serializable</em>. Most DBs default to <strong>read committed</strong>; know that lower levels admit anomalies (dirty reads, non-repeatable reads, phantoms).</li>
+<li><strong>BASE</strong> (the NoSQL counterpoint): <strong>B</strong>asically <strong>A</strong>vailable, <strong>S</strong>oft state, <strong>E</strong>ventually consistent — prefer answering every request over answering with the very latest value.</li>
+</ul>
+
+<h2>4. Normalization vs denormalization</h2>
+<ul>
+<li><strong>Normalize</strong> (3NF): each fact stored once. No update anomalies; smaller data; but reads need <strong>joins</strong>.</li>
+<li><strong>Denormalize:</strong> copy data to where it's read (store <code>author_name</code> on the post row). Reads get fast and join-free; writes must update every copy and can drift.</li>
+<li>Rule of thumb: <strong>normalize for writes/correctness, denormalize for reads/scale</strong>. At scale, read-heavy systems denormalize aggressively (a feed item embeds author name + avatar) and accept the update fan-out.</li>
+</ul>
+
+<h2>5. Choosing keys</h2>
+<ul>
+<li>Auto-increment IDs don't work across shards (collisions, coordination). Options: <strong>UUID</strong> (no coordination, but random → index-unfriendly), <strong>Snowflake-style IDs</strong> (timestamp + machine + sequence → unique, roughly sortable by time), or a central <strong>ticket server</strong>.</li>
+<li>Time-ordered IDs are a superpower: "sort by ID" = "sort by creation time," which feeds and pagination want anyway.</li>
+</ul>
+
+<div class="card">
+<h3>Worked example — e-commerce orders schema</h3>
+<ul>
+<li><code>users(id, email, …)</code>, <code>products(id, price, stock, …)</code>, <code>orders(id, user_id, status, total, created_at)</code>, <code>order_items(order_id, product_id, qty, unit_price)</code>.</li>
+<li>Note <code>unit_price</code> is <strong>denormalized on purpose</strong> — the order must record the price paid, even if the product's price changes later.</li>
+<li>Placing an order = one <strong>ACID transaction</strong>: insert order + items, decrement stock, fail atomically if stock insufficient → relational DB is the right call.</li>
+<li>Indexes: <code>orders(user_id, created_at)</code> for "my orders"; <code>order_items(order_id)</code>.</li>
+<li>Product <em>browsing</em> (read-heavy, no transactions) can live elsewhere — search index, cache — while checkout stays in Postgres.</li>
+</ul>
+</div>
+
+<div class="callout">
+<strong>Exercise:</strong> You're storing 10B analytics events/month (append-only, queried by <code>user_id + time range</code>, no joins, no updates). Pick a database, the partition key, and explain why Postgres is the wrong default here — then explain what you lose by leaving it.
+</div>
+
+<h2>Self-check</h2>
+<div class="card">
+<ul>
+<li>Can I give one concrete workload where SQL beats NoSQL, and one where it's the reverse?</li>
+<li>What does a B-tree index make fast, and what does it cost?</li>
+<li>Why can't <code>(user_id, created_at)</code> serve a query filtering only on <code>created_at</code>?</li>
+<li>ACID vs BASE — what is each optimizing for?</li>
+<li>When is denormalization the <em>right</em> call, and what's the price?</li>
+<li>Why do sharded systems need Snowflake-style IDs?</li>
+</ul>
+</div>
+
+<p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
+</div>
+</body>
+</html>

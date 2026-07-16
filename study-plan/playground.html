@@ -822,6 +822,8 @@ const GLOBAL_NAMES = [
   "AggregateError", "Iterator", "Float16Array", "queueMicrotask",
   // browser conveniences a solution might reach for
   "console", "setTimeout", "clearTimeout", "setInterval", "clearInterval",
+  // Node-style module access some solutions reach for
+  "require",
 ];
 const GLOBALS = Object.fromEntries(GLOBAL_NAMES.map((n) => [n, "readonly"]));
 
@@ -1352,6 +1354,345 @@ const esLintExtension = linter((view) => {
         function __buildTree(arr) { if (!arr.length || arr[0] == null) return null; var root = new self.TreeNode(arr[0]), q = [root], i = 1; while (i < arr.length) { var n = q.shift(); if (i < arr.length) { var lv = arr[i++]; if (lv != null) { n.left = new self.TreeNode(lv); q.push(n.left); } } if (i < arr.length) { var rv = arr[i++]; if (rv != null) { n.right = new self.TreeNode(rv); q.push(n.right); } } } return root; }
         function __buildGraph(adj) { if (!adj.length) return null; var nodes = adj.map(function (_, i) { return new self.Node(i + 1); }); adj.forEach(function (nbrs, i) { nodes[i].neighbors = nbrs.map(function (j) { return nodes[j - 1]; }); }); return nodes[0]; }
         function __graphToAdj(node) { if (!node) return []; var map = new Map(), stack = [node]; map.set(node.val, node); while (stack.length) { var n = stack.pop(); for (var k = 0; k < n.neighbors.length; k++) { var nb = n.neighbors[k]; if (!map.has(nb.val)) { map.set(nb.val, nb); stack.push(nb); } } } var maxVal = 0; map.forEach(function (_, v) { if (v > maxVal) maxVal = v; }); var res = []; for (var v = 1; v <= maxVal; v++) { var nd = map.get(v); res.push(nd ? nd.neighbors.map(function (x) { return x.val; }) : []); } return res; }
+
+        // Node-style require() shims for the @datastructures-js structures LeetCode
+        // ships, so require('@datastructures-js/<pkg>') works offline in the worker.
+        // Each mirrors the v6 public API closely enough for solving problems.
+
+        // ---- shared binary-heap engine (min-oriented on the given compare) ----
+        function __siftUp(h, c, i) {
+          while (i > 0) { var p = (i - 1) >> 1; if (c(h[i], h[p]) >= 0) break; var t = h[p]; h[p] = h[i]; h[i] = t; i = p; }
+        }
+        function __siftDown(h, c) {
+          var i = 0, n = h.length;
+          for (;;) { var l = 2 * i + 1, r = 2 * i + 2, s = i;
+            if (l < n && c(h[l], h[s]) < 0) s = l;
+            if (r < n && c(h[r], h[s]) < 0) s = r;
+            if (s === i) break; var t = h[s]; h[s] = h[i]; h[i] = t; i = s; }
+        }
+
+        // ---- @datastructures-js/priority-queue ----
+        // Plain values, enqueue/dequeue/front with push/pop/peek aliases. The
+        // constructor takes an optional compare (a, b) => number or extractor el => priority.
+        function __Heap(compare) { this._c = compare; this._h = []; }
+        __Heap.prototype.size = function () { return this._h.length; };
+        __Heap.prototype.isEmpty = function () { return this._h.length === 0; };
+        __Heap.prototype.front = function () { return this._h.length ? this._h[0] : null; };
+        __Heap.prototype.peek = __Heap.prototype.front;
+        __Heap.prototype.toArray = function () { return this._h.slice(); };
+        __Heap.prototype.enqueue = function (v) { this._h.push(v); __siftUp(this._h, this._c, this._h.length - 1); return this; };
+        __Heap.prototype.push = __Heap.prototype.enqueue;
+        __Heap.prototype.dequeue = function () {
+          var h = this._h; if (!h.length) return null; var top = h[0], last = h.pop();
+          if (h.length) { h[0] = last; __siftDown(h, this._c); }
+          return top;
+        };
+        __Heap.prototype.pop = __Heap.prototype.dequeue;
+        function __pqCompare(arg, sign) {
+          if (!arg) return function (a, b) { return sign * (a - b); };
+          if (arg.length >= 2) return function (a, b) { return sign * arg(a, b); }; // (a, b) => number
+          return function (a, b) { return sign * (arg(a) - arg(b)); };             // el => priority
+        }
+        function MinPriorityQueue(arg) { __Heap.call(this, __pqCompare(arg, 1)); }
+        MinPriorityQueue.prototype = __Heap.prototype;
+        function MaxPriorityQueue(arg) { __Heap.call(this, __pqCompare(arg, -1)); }
+        MaxPriorityQueue.prototype = __Heap.prototype;
+        function PriorityQueue(arg) { __Heap.call(this, arg && arg.length >= 2 ? arg : __pqCompare(arg, 1)); }
+        PriorityQueue.prototype = __Heap.prototype;
+
+        // ---- @datastructures-js/heap ----
+        // insert/extractRoot/root with push/pop/top aliases. Heap(compare, values);
+        // MinHeap/MaxHeap take an optional getCompareValue el => comparable.
+        function Heap(compare, values) {
+          this._c = compare || function (a, b) { return a < b ? -1 : a > b ? 1 : 0; };
+          this._h = [];
+          if (Array.isArray(values)) for (var i = 0; i < values.length; i++) this.insert(values[i]);
+        }
+        Heap.prototype.insert = function (v) { this._h.push(v); __siftUp(this._h, this._c, this._h.length - 1); return this; };
+        Heap.prototype.push = Heap.prototype.insert;
+        Heap.prototype.extractRoot = function () {
+          var h = this._h; if (!h.length) return null; var top = h[0], last = h.pop();
+          if (h.length) { h[0] = last; __siftDown(h, this._c); }
+          return top;
+        };
+        Heap.prototype.pop = Heap.prototype.extractRoot;
+        Heap.prototype.root = function () { return this._h.length ? this._h[0] : null; };
+        Heap.prototype.top = Heap.prototype.root;
+        Heap.prototype.size = function () { return this._h.length; };
+        Heap.prototype.isEmpty = function () { return this._h.length === 0; };
+        Heap.prototype.clear = function () { this._h = []; return this; };
+        Heap.prototype.toArray = function () { return this._h.slice(); };
+        function __ordCompare(gcv, sign) {
+          return function (a, b) { var va = gcv ? gcv(a) : a, vb = gcv ? gcv(b) : b; return va < vb ? -sign : va > vb ? sign : 0; };
+        }
+        function MinHeap(gcv) { Heap.call(this, __ordCompare(gcv, 1)); }
+        MinHeap.prototype = Object.create(Heap.prototype);
+        function MaxHeap(gcv) { Heap.call(this, __ordCompare(gcv, -1)); }
+        MaxHeap.prototype = Object.create(Heap.prototype);
+
+        // ---- @datastructures-js/queue (amortized O(1) via a moving offset) ----
+        function Queue(elements) { this._e = Array.isArray(elements) ? elements.slice() : []; this._o = 0; }
+        Queue.prototype.enqueue = function (v) { this._e.push(v); return this; };
+        Queue.prototype.push = Queue.prototype.enqueue;
+        Queue.prototype.dequeue = function () {
+          if (this._o >= this._e.length) return null;
+          var v = this._e[this._o++];
+          if (this._o * 2 >= this._e.length) { this._e = this._e.slice(this._o); this._o = 0; }
+          return v;
+        };
+        Queue.prototype.front = function () { return this._o < this._e.length ? this._e[this._o] : null; };
+        Queue.prototype.back = function () { return this._e.length > this._o ? this._e[this._e.length - 1] : null; };
+        Queue.prototype.size = function () { return this._e.length - this._o; };
+        Queue.prototype.isEmpty = function () { return this.size() === 0; };
+        Queue.prototype.toArray = function () { return this._e.slice(this._o); };
+        Queue.prototype.clear = function () { this._e = []; this._o = 0; };
+        Queue.fromArray = function (a) { return new Queue(a); };
+
+        // ---- @datastructures-js/stack ----
+        function Stack(elements) { this._e = Array.isArray(elements) ? elements.slice() : []; }
+        Stack.prototype.push = function (v) { this._e.push(v); return this; };
+        Stack.prototype.pop = function () { return this._e.length ? this._e.pop() : null; };
+        Stack.prototype.peek = function () { return this._e.length ? this._e[this._e.length - 1] : null; };
+        Stack.prototype.size = function () { return this._e.length; };
+        Stack.prototype.isEmpty = function () { return this._e.length === 0; };
+        Stack.prototype.toArray = function () { return this._e.slice(); };
+        Stack.prototype.clear = function () { this._e = []; };
+        Stack.fromArray = function (a) { return new Stack(a); };
+
+        // ---- @datastructures-js/deque ----
+        function Deque(elements) { this._e = Array.isArray(elements) ? elements.slice() : []; }
+        Deque.prototype.pushBack = function (v) { this._e.push(v); return this; };
+        Deque.prototype.pushFront = function (v) { this._e.unshift(v); return this; };
+        Deque.prototype.popBack = function () { return this._e.length ? this._e.pop() : null; };
+        Deque.prototype.popFront = function () { return this._e.length ? this._e.shift() : null; };
+        Deque.prototype.front = function () { return this._e.length ? this._e[0] : null; };
+        Deque.prototype.back = function () { return this._e.length ? this._e[this._e.length - 1] : null; };
+        Deque.prototype.size = function () { return this._e.length; };
+        Deque.prototype.isEmpty = function () { return this._e.length === 0; };
+        Deque.prototype.toArray = function () { return this._e.slice(); };
+        Deque.prototype.clear = function () { this._e = []; };
+
+        // ---- @datastructures-js/linked-list ----
+        function LinkedListNode(value) { this._value = value; this._next = null; }
+        LinkedListNode.prototype.getValue = function () { return this._value; };
+        LinkedListNode.prototype.getNext = function () { return this._next; };
+        function LinkedList() { this._head = null; this._count = 0; }
+        LinkedList.prototype.insertFirst = function (value) { var n = new LinkedListNode(value); n._next = this._head; this._head = n; this._count++; return n; };
+        LinkedList.prototype.insertLast = function (value) {
+          var n = new LinkedListNode(value);
+          if (!this._head) { this._head = n; } else { var cur = this._head; while (cur._next) cur = cur._next; cur._next = n; }
+          this._count++; return n;
+        };
+        LinkedList.prototype.insertAt = function (pos, value) {
+          if (pos < 0 || pos > this._count) throw new Error("position out of bounds");
+          if (pos === 0) return this.insertFirst(value);
+          var prev = this._head; for (var i = 0; i < pos - 1; i++) prev = prev._next;
+          var n = new LinkedListNode(value); n._next = prev._next; prev._next = n; this._count++; return n;
+        };
+        LinkedList.prototype.removeFirst = function () {
+          if (!this._head) return null; var n = this._head; this._head = n._next; n._next = null; this._count--; return n;
+        };
+        LinkedList.prototype.removeLast = function () {
+          if (!this._head) return null;
+          if (!this._head._next) return this.removeFirst();
+          var prev = this._head; while (prev._next._next) prev = prev._next;
+          var n = prev._next; prev._next = null; this._count--; return n;
+        };
+        LinkedList.prototype.removeAt = function (pos) {
+          if (pos < 0 || pos >= this._count || !this._head) return null;
+          if (pos === 0) return this.removeFirst();
+          var prev = this._head; for (var i = 0; i < pos - 1; i++) prev = prev._next;
+          var n = prev._next; prev._next = n._next; n._next = null; this._count--; return n;
+        };
+        LinkedList.prototype.forEach = function (cb) { var cur = this._head, i = 0; while (cur) { cb(cur, i++); cur = cur._next; } };
+        LinkedList.prototype.find = function (cb) { var cur = this._head; while (cur) { if (cb(cur)) return cur; cur = cur._next; } return null; };
+        LinkedList.prototype.toArray = function () { var out = [], cur = this._head; while (cur) { out.push(cur._value); cur = cur._next; } return out; };
+        LinkedList.prototype.head = function () { return this._head; };
+        LinkedList.prototype.count = function () { return this._count; };
+        LinkedList.prototype.isEmpty = function () { return this._count === 0; };
+        LinkedList.prototype.clear = function () { this._head = null; this._count = 0; };
+
+        // ---- @datastructures-js/linked-list (DoublyLinkedList) ----
+        function DoublyLinkedListNode(value) { this._value = value; this._prev = null; this._next = null; }
+        DoublyLinkedListNode.prototype.getValue = function () { return this._value; };
+        DoublyLinkedListNode.prototype.getNext = function () { return this._next; };
+        DoublyLinkedListNode.prototype.getPrev = function () { return this._prev; };
+        function DoublyLinkedList() { this._head = null; this._tail = null; this._count = 0; }
+        DoublyLinkedList.prototype.insertFirst = function (value) {
+          var n = new DoublyLinkedListNode(value);
+          if (!this._head) { this._head = this._tail = n; } else { n._next = this._head; this._head._prev = n; this._head = n; }
+          this._count++; return n;
+        };
+        DoublyLinkedList.prototype.insertLast = function (value) {
+          var n = new DoublyLinkedListNode(value);
+          if (!this._tail) { this._head = this._tail = n; } else { n._prev = this._tail; this._tail._next = n; this._tail = n; }
+          this._count++; return n;
+        };
+        DoublyLinkedList.prototype.removeFirst = function () {
+          if (!this._head) return null; var n = this._head;
+          this._head = n._next; if (this._head) this._head._prev = null; else this._tail = null;
+          n._next = null; this._count--; return n;
+        };
+        DoublyLinkedList.prototype.removeLast = function () {
+          if (!this._tail) return null; var n = this._tail;
+          this._tail = n._prev; if (this._tail) this._tail._next = null; else this._head = null;
+          n._prev = null; this._count--; return n;
+        };
+        DoublyLinkedList.prototype.forEach = function (cb) { var cur = this._head, i = 0; while (cur) { cb(cur, i++); cur = cur._next; } };
+        DoublyLinkedList.prototype.find = function (cb) { var cur = this._head; while (cur) { if (cb(cur)) return cur; cur = cur._next; } return null; };
+        DoublyLinkedList.prototype.toArray = function () { var out = [], cur = this._head; while (cur) { out.push(cur._value); cur = cur._next; } return out; };
+        DoublyLinkedList.prototype.head = function () { return this._head; };
+        DoublyLinkedList.prototype.tail = function () { return this._tail; };
+        DoublyLinkedList.prototype.count = function () { return this._count; };
+        DoublyLinkedList.prototype.isEmpty = function () { return this._count === 0; };
+        DoublyLinkedList.prototype.clear = function () { this._head = this._tail = null; this._count = 0; };
+
+        // ---- @datastructures-js/trie ----
+        function __TrieNode(char) { this._char = char; this._children = {}; this._isEnd = false; }
+        function Trie() { this._root = new __TrieNode(""); this._words = 0; this._nodes = 1; }
+        Trie.prototype.insert = function (word) {
+          word = String(word); var cur = this._root;
+          for (var i = 0; i < word.length; i++) { var c = word[i];
+            if (!cur._children[c]) { cur._children[c] = new __TrieNode(c); this._nodes++; }
+            cur = cur._children[c]; }
+          if (!cur._isEnd) { cur._isEnd = true; this._words++; }
+          return this;
+        };
+        Trie.prototype.__node = function (word) {
+          word = String(word); var cur = this._root;
+          for (var i = 0; i < word.length; i++) { cur = cur._children[word[i]]; if (!cur) return null; }
+          return cur;
+        };
+        Trie.prototype.has = function (word) { var n = this.__node(word); return !!n && n._isEnd; };
+        Trie.prototype.find = function (word) { return this.__node(word); };
+        Trie.prototype.remove = function (word) { var n = this.__node(word); if (n && n._isEnd) { n._isEnd = false; this._words--; return word; } return null; };
+        Trie.prototype.forEach = function (cb) {
+          (function walk(node, prefix) {
+            if (node._isEnd) cb(prefix);
+            for (var c in node._children) walk(node._children[c], prefix + c);
+          })(this._root, "");
+        };
+        Trie.prototype.toArray = function () { var out = []; this.forEach(function (w) { out.push(w); }); return out; };
+        Trie.prototype.wordsCount = function () { return this._words; };
+        Trie.prototype.nodesCount = function () { return this._nodes; };
+
+        // ---- @datastructures-js/set (EnhancedSet extends the native Set) ----
+        function EnhancedSet(values) { var s = new Set(values);
+          s.union = function (o) { return new EnhancedSet([].concat([].slice.call(this), [].slice.call(o))); };
+          s.intersect = function (o) { var r = []; this.forEach(function (v) { if (o.has(v)) r.push(v); }); return new EnhancedSet(r); };
+          s.difference = function (o) { var r = []; this.forEach(function (v) { if (!o.has(v)) r.push(v); }); return new EnhancedSet(r); };
+          s.isSubsetOf = function (o) { var ok = true; this.forEach(function (v) { if (!o.has(v)) ok = false; }); return ok; };
+          s.isSupersetOf = function (o) { var self2 = this, ok = true; o.forEach(function (v) { if (!self2.has(v)) ok = false; }); return ok; };
+          s.isEqual = function (o) { return this.size === o.size && this.isSubsetOf(o); };
+          return s;
+        }
+
+        // ---- @datastructures-js/binary-search-tree ----
+        // insert(key, value?)/find/has/min/max/remove plus in/pre/post-order traversal.
+        // AVLTree shares this API (unbalanced here — fine for correctness, not big-O).
+        function __BstNode(key, value) { this.key = key; this.value = value; this.left = null; this.right = null; }
+        function BinarySearchTree(compare) { this._c = compare || function (a, b) { return a < b ? -1 : a > b ? 1 : 0; }; this._root = null; this._count = 0; }
+        BinarySearchTree.prototype.insert = function (key, value) {
+          var n = new __BstNode(key, value === undefined ? key : value);
+          if (!this._root) { this._root = n; this._count++; return this; }
+          var cur = this._root;
+          for (;;) { var cmp = this._c(key, cur.key);
+            if (cmp === 0) { cur.value = n.value; return this; }
+            if (cmp < 0) { if (!cur.left) { cur.left = n; break; } cur = cur.left; }
+            else { if (!cur.right) { cur.right = n; break; } cur = cur.right; } }
+          this._count++; return this;
+        };
+        BinarySearchTree.prototype.find = function (key) {
+          var cur = this._root; while (cur) { var cmp = this._c(key, cur.key); if (cmp === 0) return cur; cur = cmp < 0 ? cur.left : cur.right; } return null;
+        };
+        BinarySearchTree.prototype.has = function (key) { return !!this.find(key); };
+        BinarySearchTree.prototype.min = function () { var cur = this._root; if (!cur) return null; while (cur.left) cur = cur.left; return cur; };
+        BinarySearchTree.prototype.max = function () { var cur = this._root; if (!cur) return null; while (cur.right) cur = cur.right; return cur; };
+        BinarySearchTree.prototype.root = function () { return this._root; };
+        BinarySearchTree.prototype.count = function () { return this._count; };
+        BinarySearchTree.prototype.remove = function (key) {
+          var self2 = this;
+          function rm(node, key) {
+            if (!node) return null;
+            var cmp = self2._c(key, node.key);
+            if (cmp < 0) { node.left = rm(node.left, key); return node; }
+            if (cmp > 0) { node.right = rm(node.right, key); return node; }
+            self2._count--;
+            if (!node.left) return node.right;
+            if (!node.right) return node.left;
+            var succ = node.right; while (succ.left) succ = succ.left;
+            node.key = succ.key; node.value = succ.value;
+            self2._count++; node.right = rm(node.right, succ.key);
+            return node;
+          }
+          this._root = rm(this._root, key); return this;
+        };
+        BinarySearchTree.prototype.traverseInOrder = function (cb) { (function w(n) { if (!n) return; w(n.left); cb(n); w(n.right); })(this._root); };
+        BinarySearchTree.prototype.traversePreOrder = function (cb) { (function w(n) { if (!n) return; cb(n); w(n.left); w(n.right); })(this._root); };
+        BinarySearchTree.prototype.traversePostOrder = function (cb) { (function w(n) { if (!n) return; w(n.left); w(n.right); cb(n); })(this._root); };
+        function AVLTree(compare) { BinarySearchTree.call(this, compare); }
+        AVLTree.prototype = Object.create(BinarySearchTree.prototype);
+
+        // ---- @datastructures-js/graph ----
+        function Graph() { this._vertices = new Map(); this._edges = new Map(); this._directed = false; this._edgesCount = 0; }
+        Graph.prototype.addVertex = function (key, value) { if (!this._vertices.has(key)) this._edges.set(key, new Map()); this._vertices.set(key, value === undefined ? key : value); return this; };
+        Graph.prototype.hasVertex = function (key) { return this._vertices.has(key); };
+        Graph.prototype.getVerticesCount = function () { return this._vertices.size; };
+        Graph.prototype.getEdgesCount = function () { return this._edgesCount; };
+        Graph.prototype.addEdge = function (src, dest, weight) {
+          if (!this._vertices.has(src)) this.addVertex(src);
+          if (!this._vertices.has(dest)) this.addVertex(dest);
+          var w = weight === undefined ? 1 : weight;
+          if (!this._edges.get(src).has(dest)) this._edgesCount++;
+          this._edges.get(src).set(dest, w);
+          if (!this._directed) this._edges.get(dest).set(src, w);
+          return this;
+        };
+        Graph.prototype.hasEdge = function (src, dest) { return this._edges.has(src) && this._edges.get(src).has(dest); };
+        Graph.prototype.getWeight = function (src, dest) { return this.hasEdge(src, dest) ? this._edges.get(src).get(dest) : (src === dest ? 0 : Infinity); };
+        Graph.prototype.removeEdge = function (src, dest) {
+          if (this.hasEdge(src, dest)) { this._edges.get(src).delete(dest); if (!this._directed) this._edges.get(dest).delete(src); this._edgesCount--; }
+          return this;
+        };
+        Graph.prototype.removeVertex = function (key) {
+          if (!this._vertices.has(key)) return this;
+          var self2 = this;
+          this._edges.get(key).forEach(function (_, dest) { self2.removeEdge(key, dest); });
+          this._edges.forEach(function (m, src) { if (m.has(key)) self2.removeEdge(src, key); });
+          this._vertices.delete(key); this._edges.delete(key); return this;
+        };
+        Graph.prototype.getConnectedVertices = function (key) { return this._edges.has(key) ? [].slice.call(this._edges.get(key).keys()) : []; };
+        Graph.prototype.traverseBfs = function (start, cb) {
+          if (!this._vertices.has(start)) return; var seen = new Set([start]), q = [start];
+          while (q.length) { var v = q.shift(); cb(v, this._vertices.get(v));
+            var self2 = this; this._edges.get(v).forEach(function (_, nb) { if (!seen.has(nb)) { seen.add(nb); q.push(nb); } }); }
+        };
+        Graph.prototype.traverseDfs = function (start, cb) {
+          if (!this._vertices.has(start)) return; var seen = new Set(), self2 = this;
+          (function dfs(v) { if (seen.has(v)) return; seen.add(v); cb(v, self2._vertices.get(v));
+            self2._edges.get(v).forEach(function (_, nb) { dfs(nb); }); })(start);
+        };
+        function DirectedGraph() { Graph.call(this); this._directed = true; }
+        DirectedGraph.prototype = Object.create(Graph.prototype);
+
+        var __MODULES = {
+          "priority-queue": { MinPriorityQueue: MinPriorityQueue, MaxPriorityQueue: MaxPriorityQueue, PriorityQueue: PriorityQueue },
+          "heap": { Heap: Heap, MinHeap: MinHeap, MaxHeap: MaxHeap },
+          "queue": { Queue: Queue },
+          "stack": { Stack: Stack },
+          "deque": { Deque: Deque },
+          "linked-list": { LinkedList: LinkedList, LinkedListNode: LinkedListNode, DoublyLinkedList: DoublyLinkedList, DoublyLinkedListNode: DoublyLinkedListNode },
+          "trie": { Trie: Trie },
+          "set": { Set: EnhancedSet, EnhancedSet: EnhancedSet },
+          "binary-search-tree": { BinarySearchTree: BinarySearchTree, AVLTree: AVLTree },
+          "graph": { Graph: Graph, DirectedGraph: DirectedGraph },
+        };
+        function require(name) {
+          var key = String(name).replace(/^@datastructures?-js\\//, "").replace(/^datastructures?\\//, "");
+          if (__MODULES.hasOwnProperty(key)) return __MODULES[key];
+          throw new Error("Cannot find module '" + name + "'. Available: " + Object.keys(__MODULES).join(", "));
+        }
+        self.require = require;
 
         self.onmessage = function (e) {
           const { userCode, fnName, cases, io } = e.data;

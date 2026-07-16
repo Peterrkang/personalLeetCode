@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Case Studies: YouTube &amp; Dropbox</title>
+<link rel="stylesheet" href="../study-plan/style.css">
+</head>
+<body>
+<nav><div class="inner">
+  <a href="../study-plan/index.html">Overview</a>
+  <a href="../study-plan/system-design-curriculum.html">SD Curriculum</a>
+  <a href="index.html" class="active">SD Notes</a>
+  <a href="../study-plan/patterns.html">Patterns</a>
+  <a href="../study-plan/templates.html">Templates</a>
+  <a href="../study-plan/cheatsheet.html">JS Cheatsheet</a>
+  <a href="../study-plan/flashcards.html">Flashcards</a>
+  <a href="../study-plan/playground.html">Playground</a>
+</div></nav>
+<div class="wrap">
+
+<p class="subtitle"><a href="index.html">← All topics</a></p>
+<h1>Week 10 — Case Studies: YouTube &amp; Dropbox</h1>
+<p class="subtitle">Media and file systems: the data is huge, dumb, and immutable — so the design centers on pipelines, chunking, and CDNs rather than clever databases.</p>
+
+<h2>Case 1 — YouTube / Netflix</h2>
+
+<h3>Requirements &amp; estimates</h3>
+<ul>
+<li><strong>Functional:</strong> upload video; watch (stream) video; metadata (titles, views, likes); search — mention, don't build.</li>
+<li><strong>Non-functional:</strong> smooth playback everywhere on any connection; upload can be <em>slow</em> but must be <em>reliable</em>. Reads ≫ writes (1000:1).</li>
+<li><strong>Estimate flavor:</strong> 500 hrs of video uploaded/min; a 10-min 1080p video ≈ 1 GB raw, a few hundred MB transcoded across renditions. Bandwidth, storage, and CDN egress dominate — this is a <strong>cost-engineering</strong> problem.</li>
+</ul>
+
+<h3>Upload &amp; transcoding pipeline (the deep dive)</h3>
+<ol>
+<li>Client gets a <strong>pre-signed URL</strong> and uploads directly to object storage in <strong>resumable chunks</strong> — app servers never touch the bytes.</li>
+<li>Upload-complete event → queue → <strong>transcoding pipeline</strong> (this is week 6's pipeline at industrial scale).</li>
+<li>Transcoder <strong>splits video into segments</strong> (~2–10 s each), transcodes each segment into a <strong>ladder of renditions</strong> (240p → 4K) <strong>in parallel</strong> across a worker fleet — a 2-hour movie transcodes in minutes because it's embarrassingly parallel. It's a DAG: split → transcode segments → also generate thumbnails/captions → stitch manifest → validate → publish.</li>
+<li>Output: segments + a <strong>manifest</strong> (HLS/DASH) listing every rendition's segment URLs → pushed to <strong>CDN</strong>.</li>
+<li>Video status: processing → ready; notify uploader async.</li>
+</ol>
+
+<h3>Playback — adaptive bitrate streaming</h3>
+<ul>
+<li>Player fetches the manifest, then requests segments over plain HTTP, <strong>choosing the rendition per segment</strong> based on measured bandwidth — degrade to 480p on bad Wi-Fi, back to 1080p when it recovers. No special protocol; it's all cacheable HTTP, which is why CDNs work.</li>
+<li>Popular content sits in edge caches (Netflix ships appliances into ISPs); the long tail pulls from origin.</li>
+<li>Metadata (title, counts, comments) is a normal read-heavy web service: DB + cache, view counts via buffered counters (week 8).</li>
+</ul>
+
+<h2>Case 2 — Dropbox / Google Drive (file sync &amp; object storage)</h2>
+
+<h3>The key idea: chunking</h3>
+<ul>
+<li>Files split into <strong>~4 MB chunks</strong>, each identified by the <strong>hash of its content</strong>.</li>
+<li><strong>Delta sync:</strong> edit a 1 GB file → only changed chunks re-upload.</li>
+<li><strong>Dedup:</strong> chunk already known (same hash from any user)? Don't store it twice.</li>
+<li><strong>Resumable transfers:</strong> a dropped connection resumes at the next chunk.</li>
+</ul>
+
+<h3>Architecture</h3>
+<ul>
+<li><strong>Block service:</strong> stores chunks in object storage, keyed by content hash. Dumb and infinitely scalable.</li>
+<li><strong>Metadata service:</strong> the brain — <code>file → ordered chunk list</code>, versions, folder tree, sharing ACLs. Relational DB, sharded by user/namespace. <strong>Consistency matters here</strong> (two devices editing metadata) even though chunk storage is trivially eventual.</li>
+<li><strong>Sync flow:</strong> client watches FS → computes changed chunks → uploads missing chunks → commits new metadata version atomically → <strong>notification service</strong> (long polling in Dropbox's design) tells other devices → they pull the delta.</li>
+<li><strong>Conflicts:</strong> two offline edits to the same file → don't merge, don't drop: keep both (<code>report (Bob's conflicted copy)</code>). Versioning = keeping old chunk lists — chunks are immutable, so history is nearly free.</li>
+</ul>
+
+<div class="callout tip">
+<strong>Pattern to reuse everywhere:</strong> separate the <strong>data plane</strong> (huge, dumb, immutable, cache-friendly — chunks/segments on object storage + CDN) from the <strong>control plane</strong> (small, smart, consistent — metadata in a proper DB). YouTube, Dropbox, S3, and Instagram all decompose this way.
+</div>
+
+<div class="callout">
+<strong>Exercise (45 min):</strong> Design YouTube; deep-dive the transcoding DAG — how do you parallelize a single video, track per-segment failures, and retry without redoing the whole job? Then, for Dropbox: two devices edit the same file offline — walk both syncing back and exactly where the conflict is detected.
+</div>
+
+<h2>Self-check</h2>
+<div class="card">
+<ul>
+<li>Why do clients upload straight to object storage instead of through app servers?</li>
+<li>Why segment videos before transcoding? (Two reasons: parallelism + ABR.)</li>
+<li>How does adaptive bitrate streaming actually pick a quality?</li>
+<li>What three features fall out of content-hash chunking almost for free?</li>
+<li>Which part of Dropbox needs strong consistency, and which is happily eventual?</li>
+<li>How do immutable chunks make file versioning cheap?</li>
+</ul>
+</div>
+
+<p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
+</div>
+</body>
+</html>

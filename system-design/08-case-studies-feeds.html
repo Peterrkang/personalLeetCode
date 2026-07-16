@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Case Studies: News Feed &amp; Instagram</title>
+<link rel="stylesheet" href="../study-plan/style.css">
+</head>
+<body>
+<nav><div class="inner">
+  <a href="../study-plan/index.html">Overview</a>
+  <a href="../study-plan/system-design-curriculum.html">SD Curriculum</a>
+  <a href="index.html" class="active">SD Notes</a>
+  <a href="../study-plan/patterns.html">Patterns</a>
+  <a href="../study-plan/templates.html">Templates</a>
+  <a href="../study-plan/cheatsheet.html">JS Cheatsheet</a>
+  <a href="../study-plan/flashcards.html">Flashcards</a>
+  <a href="../study-plan/playground.html">Playground</a>
+</div></nav>
+<div class="wrap">
+
+<p class="subtitle"><a href="index.html">← All topics</a></p>
+<h1>Week 8 — Case Studies: News Feed &amp; Instagram</h1>
+<p class="subtitle">The most-asked interview design. The entire problem reduces to one decision — fan-out on write vs fan-out on read — and how you handle the celebrity who breaks it.</p>
+
+<h2>Case 1 — Twitter / news feed</h2>
+
+<h3>Requirements &amp; estimates</h3>
+<ul>
+<li><strong>Functional:</strong> post tweet; follow users; home timeline = recent tweets from everyone you follow, newest-ish first.</li>
+<li><strong>Non-functional:</strong> feed load &lt; 200 ms; extreme read skew (browse ≫ post); <strong>eventual consistency is fine</strong> — nobody notices a tweet arriving 5 s late. Availability over consistency.</li>
+<li><strong>Estimate:</strong> 200M DAU, 2 posts/day → ~5k writes/sec; each user loads the feed 10×/day → ~25k feed reads/sec, each needing ~dozens of tweets. Naive per-load computation = death by fan-in.</li>
+</ul>
+
+<h3>The core decision — fan-out on write vs read</h3>
+<table>
+<tr><th></th><th>Fan-out on <strong>write</strong> (push)</th><th>Fan-out on <strong>read</strong> (pull)</th></tr>
+<tr><td>On tweet</td><td>Insert tweet ID into <strong>every follower's</strong> precomputed feed list (Redis)</td><td>Just store the tweet</td></tr>
+<tr><td>On feed load</td><td>Read your list — <strong>one cache read</strong>, blazing fast</td><td>Fetch recent tweets from <strong>all N followees</strong>, merge, sort — N reads per load</td></tr>
+<tr><td>Cost lands on</td><td>Write time (async, invisible to users)</td><td>Read time (the thing we promised would be fast)</td></tr>
+<tr><td>Breaks when</td><td><strong>Celebrity posts:</strong> 100M followers = 100M list inserts for one tweet</td><td>User follows thousands → slow merges every load</td></tr>
+</table>
+<div class="callout tip">
+<strong>The answer interviewers want — hybrid:</strong> fan-out on write for normal users (99.9%+), but <strong>don't fan out celebrities</strong>. Mark accounts over a follower threshold; at read time, merge your precomputed list with a pull of the handful of celebrities you follow (their recent tweets are guaranteed cache-hot anyway). Inactive users (no login in 30 days) get no push either — compute on return.
+</div>
+
+<h3>Design</h3>
+<ul>
+<li>Post path: write tweet to DB (sharded by <code>tweet_id</code>, Snowflake IDs so ID order ≈ time order) → publish to <strong>queue</strong> → fan-out workers push the ID into followers' Redis lists (capped at ~800 entries; deep history falls back to pull).</li>
+<li>Read path: Redis <code>feed:{user_id}</code> → list of tweet IDs → hydrate from a tweet-content cache → merge celebrity pull → return. <strong>Cursor pagination</strong> by tweet ID.</li>
+<li>Social graph: <code>follows(follower_id, followee_id)</code> sharded by follower for "who do I follow", plus an inverted copy sharded by followee for fan-out. (Two copies — writes update both.)</li>
+<li>Ranking: start chronological; mention that ranked feeds score candidates with a model at read time — don't go deeper unless asked.</li>
+</ul>
+
+<h2>Case 2 — Instagram (photo feed)</h2>
+<p>Same skeleton as Twitter plus a <strong>media pipeline</strong> — reuse week 6's design:</p>
+<ul>
+<li>Upload: original → <strong>object storage (S3)</strong>; queue → workers make thumbnail/medium/full sizes; DB row holds <strong>metadata + S3 keys only</strong> (never blobs in the DB).</li>
+<li>Serve every image via <strong>CDN</strong>; feed responses carry CDN URLs.</li>
+<li>Feed = fan-out on write of <strong>photo IDs</strong> (not images) exactly as above; celebrity exception applies doubly (Instagram is celebrity-dense).</li>
+<li>Estimate flavor: 100M uploads/day × 2 MB avg ≈ <strong>200 TB/day</strong> of media — storage cost and CDN egress dominate this system, not the metadata DB.</li>
+</ul>
+
+<h3>Likes &amp; counters (classic follow-up)</h3>
+<ul>
+<li>Naive <code>UPDATE count = count + 1</code> on a viral post = one hot row taking thousands of writes/sec.</li>
+<li>Fix: shard the counter (N sub-counters, read sums them) or buffer increments in Redis and flush batches to the DB. Counts can be seconds-stale — say so.</li>
+</ul>
+
+<div class="callout">
+<strong>Exercise (45 min, then self-critique):</strong> Design Twitter end-to-end with the hybrid fan-out. Then stress it: what breaks at 10× DAU? Where does replication lag show up visibly (hint: "I posted but my own profile doesn't show it")? How do you fix read-your-own-writes for the author?
+</div>
+
+<h2>Self-check</h2>
+<div class="card">
+<ul>
+<li>Fan-out on write vs read — cost of each, and who pays it?</li>
+<li>Why exactly does push break for celebrities, and what's the hybrid?</li>
+<li>Why Snowflake IDs instead of auto-increment for tweets?</li>
+<li>Why cap the precomputed feed list at ~800 entries?</li>
+<li>Where do the actual image bytes live, and what's in the DB?</li>
+<li>How do you count likes on a viral post without melting a row?</li>
+</ul>
+</div>
+
+<p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
+</div>
+</body>
+</html>

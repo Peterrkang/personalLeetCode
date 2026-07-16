@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Advanced Distributed Systems</title>
+<link rel="stylesheet" href="../study-plan/style.css">
+</head>
+<body>
+<nav><div class="inner">
+  <a href="../study-plan/index.html">Overview</a>
+  <a href="../study-plan/system-design-curriculum.html">SD Curriculum</a>
+  <a href="index.html" class="active">SD Notes</a>
+  <a href="../study-plan/patterns.html">Patterns</a>
+  <a href="../study-plan/templates.html">Templates</a>
+  <a href="../study-plan/cheatsheet.html">JS Cheatsheet</a>
+  <a href="../study-plan/flashcards.html">Flashcards</a>
+  <a href="../study-plan/playground.html">Playground</a>
+</div></nav>
+<div class="wrap">
+
+<p class="subtitle"><a href="index.html">← All topics</a></p>
+<h1>Week 12 — Advanced Theory &amp; Senior Depth</h1>
+<p class="subtitle">CAP applied (not recited), consistency models, quorums, the distributed-systems toolbox, and the resilience patterns that separate senior answers from mid-level ones.</p>
+
+<h2>1. CAP — applied, not memorized</h2>
+<ul>
+<li>During a <strong>network partition</strong>, choose: refuse some requests (<strong>CP</strong> — stay consistent) or answer with possibly-stale data (<strong>AP</strong> — stay available). No partition → no forced choice.</li>
+<li>It's <strong>per-operation</strong>, not per-company: your payment ledger is CP; your product-view counter is AP. Saying this is the senior move.</li>
+<li><strong>PACELC</strong> finishes the thought: if <strong>P</strong>artition → A vs C; <strong>E</strong>lse → <strong>L</strong>atency vs <strong>C</strong>onsistency. Even with no failures, strong consistency costs coordination round trips. DynamoDB default = PA/EL; a single-leader SQL setup ≈ PC/EC.</li>
+</ul>
+
+<h2>2. Consistency models (strongest → weakest)</h2>
+<table>
+<tr><th>Model</th><th>Guarantee</th><th>Example need</th></tr>
+<tr><td><strong>Linearizable (strong)</strong></td><td>Every read sees the latest acknowledged write, everywhere</td><td>Account balances, inventory at checkout, locks</td></tr>
+<tr><td><strong>Causal</strong></td><td>Causally related events appear in order (reply never precedes its post)</td><td>Comment threads, chat</td></tr>
+<tr><td><strong>Read-your-own-writes</strong></td><td>You see your own updates; others may lag</td><td>Profile edits, posting (the replication-lag fix from week 4)</td></tr>
+<tr><td><strong>Eventual</strong></td><td>Stop writing and replicas converge… eventually</td><td>Like counts, view counts, DNS</td></tr>
+</table>
+<p>Weaker = faster + more available. Pick <strong>per data type</strong> and justify — "eventual everywhere" and "strong everywhere" are both wrong answers.</p>
+
+<h2>3. Quorums</h2>
+<ul>
+<li>N replicas; a write must be acked by <strong>W</strong>, a read consults <strong>R</strong>. If <strong>R + W &gt; N</strong>, read and write sets overlap → reads see the newest write.</li>
+<li>N=3: W=2, R=2 is the balanced classic. W=1 = fast risky writes; W=3 = durable slow writes. Tune per workload — this is Cassandra/Dynamo consistency-level tuning in one line.</li>
+</ul>
+
+<h2>4. Consensus &amp; coordination (conceptual level)</h2>
+<ul>
+<li><strong>The problem:</strong> machines that crash and a network that drops messages must still <em>agree</em> on one value (who's leader, what's committed).</li>
+<li><strong>Raft</strong> (know its shape): nodes are follower / candidate / <strong>leader</strong>; leader elected by <strong>majority vote</strong> with randomized election timeouts; all writes flow through the leader, committed once a majority replicates them. Majority = any two quorums intersect → no <strong>split-brain</strong> (two leaders during a partition — the minority side can't commit).</li>
+<li>Failure detection is <strong>heartbeats</strong>: leader pings followers; silence past a timeout → new election. (Same primitive as LB health checks and chat presence — it's heartbeats all the way down.)</li>
+<li>You don't implement consensus; you rent it: <strong>ZooKeeper / etcd</strong> for leader election, distributed locks, service discovery, config. Use it for <em>coordination metadata</em>, never for data-path traffic.</li>
+</ul>
+
+<h2>5. Small tools worth name-dropping</h2>
+<ul>
+<li><strong>Bloom filter:</strong> probabilistic set — "definitely not present" or "probably present" in tiny memory. Skips useless disk lookups (LSM stores like Cassandra), pre-filters cache penetration, "username taken?" pre-check.</li>
+<li><strong>Checksums:</strong> hash data at rest / in transit; verify on read to catch silent corruption (S3 and HDFS do this on every block).</li>
+<li><strong>Gossip protocol:</strong> nodes exchange state with random peers; cluster membership/failure info spreads in O(log n) rounds without a coordinator (Cassandra, Dynamo).</li>
+<li><strong>Distributed tracing:</strong> a request ID propagated through every hop (OpenTelemetry) — how you debug a 30-service latency mystery.</li>
+</ul>
+
+<h2>6. Resilience patterns (say these unprompted)</h2>
+<ul>
+<li><strong>Timeouts everywhere</strong> — an un-timed-out call is a thread leak waiting for an outage.</li>
+<li><strong>Retries with exponential backoff + jitter</strong> — and only on idempotent operations; retry storms without jitter <em>synchronize</em> and DDoS your own recovery.</li>
+<li><strong>Circuit breaker:</strong> after N failures to a dependency, fail fast for a cooldown (half-open probe to recover) — stops cascading failure and gives the sick service air.</li>
+<li><strong>Bulkheads:</strong> partition resources (thread pools, connections) per dependency so one slow downstream can't drown everything.</li>
+<li><strong>Graceful degradation + load shedding:</strong> feed unavailable → serve cached feed; overloaded → drop low-priority traffic (analytics) before user-facing traffic. Decide the sacrifice order <em>in advance</em>.</li>
+<li><strong>Observability:</strong> metrics (RED: rate, errors, duration + queue depths), structured logs, traces; alert on <strong>SLO burn</strong>, not on every blip. SLA = external promise, SLO = internal target, SLI = the measurement.</li>
+</ul>
+
+<div class="callout tip">
+<strong>The senior close:</strong> for any design, be able to answer — What's the consistency model of each store, and why? What happens when each box dies? What do we shed first at 10× load? How would we <em>know</em> it's failing before users tweet about it?
+</div>
+
+<div class="callout">
+<strong>Exercise:</strong> Take your Week 8 Twitter design and harden it: label every datastore CP or AP with a reason; add circuit breakers where fan-out calls dependencies; define three SLOs (feed latency, post durability, availability) with SLIs; and describe the load-shedding order during a viral event.
+</div>
+
+<h2>Self-check</h2>
+<div class="card">
+<ul>
+<li>State CAP in one sentence, then apply it to a payment ledger vs a view counter.</li>
+<li>What does PACELC add that CAP misses?</li>
+<li>Why does R + W &gt; N guarantee fresh reads?</li>
+<li>How does majority voting prevent split-brain?</li>
+<li>What can a Bloom filter never tell you?</li>
+<li>Circuit breaker vs retry — when does each make an outage worse?</li>
+</ul>
+</div>
+
+<p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
+</div>
+</body>
+</html>

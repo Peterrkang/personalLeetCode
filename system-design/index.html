@@ -14,31 +14,54 @@
   <a href="../study-plan/patterns.html">Patterns</a>
   <a href="../study-plan/templates.html">Templates</a>
   <a href="../study-plan/cheatsheet.html">JS Cheatsheet</a>
+  <a href="../study-plan/flashcards.html">Flashcards</a>
   <a href="../study-plan/playground.html">Playground</a>
 </div></nav>
 <div class="wrap">
 
-<h1>System Design — Topic Notes</h1>
-<p class="subtitle">Study notes, one page per topic. Read it, then rewrite the key ideas in your own words — teaching it back is how it sticks.</p>
+<h1>System Design — The Course</h1>
+<p class="subtitle">A full system-design interview course modeled on Design Gurus' <em>Grokking the System Design Interview</em>: building blocks first, then the classic case studies, then senior-level distributed-systems depth. One page per week; read it, then rewrite the key ideas in your own words — teaching it back is how it sticks.</p>
 
 <div class="callout tip">
-These deep-dive notes pair with the week-by-week <a href="../study-plan/system-design-curriculum.html">SD Curriculum</a>. The curriculum says <em>what</em> to study each week; these pages are the <em>content</em>.
+Pairs with the week-by-week <a href="../study-plan/system-design-curriculum.html">SD Curriculum</a> (the <em>schedule</em>) and the <a href="../study-plan/flashcards.html"><strong>Flashcards</strong></a> (decks <strong>SD1–SD12</strong>, spaced-repetition review of every topic here). Read a page → drill its deck until mastered.
 </div>
 
-<h2>Topics</h2>
+<h2>Part 1 — Building blocks</h2>
 <table>
-<tr><th>#</th><th>Topic</th><th>Plan week</th><th>Status</th></tr>
-<tr><td>1</td><td><a href="01-fundamentals.html">Fundamentals</a></td><td>Week 1</td><td>Ready</td></tr>
-<tr><td>2</td><td>Networking &amp; APIs</td><td>Week 2</td><td><em>scaffold on request</em></td></tr>
-<tr><td>3</td><td>Databases</td><td>Week 3</td><td><em>scaffold on request</em></td></tr>
-<tr><td>4</td><td>Caching &amp; CDN</td><td>Week 4</td><td><em>scaffold on request</em></td></tr>
-<tr><td>5</td><td>Sharding &amp; partitioning</td><td>Week 5</td><td><em>scaffold on request</em></td></tr>
-<tr><td>6</td><td>Async &amp; messaging</td><td>Week 6</td><td><em>scaffold on request</em></td></tr>
+<tr><th>#</th><th>Topic</th><th>Covers</th><th>Plan week</th></tr>
+<tr><td>1</td><td><a href="01-fundamentals.html">Fundamentals</a></td><td>Latency vs throughput, the nines, scaling, back-of-envelope math, the 6-step framework</td><td>Week 1</td></tr>
+<tr><td>2</td><td><a href="02-networking-apis.html">Networking, Load Balancing &amp; APIs</a></td><td>DNS→server request path, proxies, L4/L7 LBs, REST vs gRPC vs GraphQL, WebSockets vs SSE vs polling</td><td>Week 2</td></tr>
+<tr><td>3</td><td><a href="03-databases.html">Databases</a></td><td>SQL vs NoSQL, indexes, ACID vs BASE, normalization vs denormalization, distributed IDs</td><td>Week 3</td></tr>
+<tr><td>4</td><td><a href="04-caching-cdn.html">Caching, CDN &amp; Replication</a></td><td>Cache-aside &amp; write strategies, eviction/invalidation, stampedes, CDNs, leader-follower replication</td><td>Week 4</td></tr>
+<tr><td>5</td><td><a href="05-sharding-consistent-hashing.html">Sharding &amp; Consistent Hashing</a></td><td>Partitioning strategies, shard keys, the ring + virtual nodes, hotspots &amp; the celebrity problem</td><td>Week 5</td></tr>
+<tr><td>6</td><td><a href="06-async-messaging.html">Async Processing &amp; Messaging</a></td><td>Queues vs Kafka, pub/sub, delivery guarantees, idempotent consumers, backpressure, DLQs</td><td>Week 6</td></tr>
 </table>
 
-<p>Want the rest of the topic pages (weeks 2–12) built out like Fundamentals? Just ask.</p>
+<h2>Part 2 — Case studies</h2>
+<table>
+<tr><th>#</th><th>Topic</th><th>Covers</th><th>Plan week</th></tr>
+<tr><td>7</td><td><a href="07-case-studies-foundational.html">URL Shortener &amp; Rate Limiter</a></td><td>Base62 keys, key-generation service, 301 vs 302; token bucket &amp; sliding windows, distributed limiting in Redis</td><td>Week 7</td></tr>
+<tr><td>8</td><td><a href="08-case-studies-feeds.html">News Feed &amp; Instagram</a></td><td>Fan-out on write vs read, the celebrity hybrid, feed caching, media pipeline, hot counters</td><td>Week 8</td></tr>
+<tr><td>9</td><td><a href="09-case-studies-realtime.html">Chat &amp; Notifications</a></td><td>WebSocket fleets, session routing, ack levels, dedupe &amp; ordering, presence, push pipelines (APNs/FCM)</td><td>Week 9</td></tr>
+<tr><td>10</td><td><a href="10-case-studies-media-storage.html">YouTube &amp; Dropbox</a></td><td>Transcoding DAG, adaptive bitrate streaming, content-hash chunking, delta sync, data plane vs control plane</td><td>Week 10</td></tr>
+<tr><td>11</td><td><a href="11-case-studies-location-search.html">Uber &amp; Typeahead</a></td><td>Geohash vs quadtree, in-memory driver index, trie with precomputed top-K, offline rebuilds</td><td>Week 11</td></tr>
+</table>
 
-<p class="footer"><a href="../study-plan/index.html">← Back to study-plan overview</a></p>
+<h2>Part 3 — Senior depth</h2>
+<table>
+<tr><th>#</th><th>Topic</th><th>Covers</th><th>Plan week</th></tr>
+<tr><td>12</td><td><a href="12-advanced-distributed.html">Advanced Distributed Systems</a></td><td>CAP &amp; PACELC applied, consistency models, quorums, Raft/leader election, Bloom filters, circuit breakers &amp; resilience</td><td>Week 12</td></tr>
+</table>
+
+<h2>How to study each week</h2>
+<ol>
+<li><strong>Read the page</strong> (~30 min), drawing every architecture yourself as you go.</li>
+<li><strong>Do the exercise</strong> at the bottom on paper, timed, using the 6-step framework.</li>
+<li><strong>Run the self-check</strong> — anything you can't answer out loud, reread.</li>
+<li><strong>Drill the matching SD deck</strong> in <a href="../study-plan/flashcards.html">Flashcards</a> until every card reaches box 5.</li>
+</ol>
+
+<p class="footer"><a href="../study-plan/index.html">← Back to study-plan overview</a> · <a href="../study-plan/flashcards.html">Flashcards →</a></p>
 </div>
 </body>
 </html>

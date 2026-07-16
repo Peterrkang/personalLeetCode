@@ -1,16 +1,14 @@
 /*
- * Flashcards for Block 4 review (flashcards.html).
+ * Card data for the flashcards page (flashcards.html).
  *
- * Self-contained, dependency-free. Cards live in CARDS below; progress is a
- * per-card Leitner box (1..5) persisted to localStorage under "fc:box:<id>".
+ * Two card sets in one deck list:
+ *   - Algorithms (Complexity / Patterns / Signal words / JS-TS) — mirrors the facts
+ *     in patterns.html, templates.html and cheatsheet.html; keep in sync.
+ *   - System design course (decks SD1..SD12, one per week) — mirrors the topic
+ *     pages in ../system-design/; keep in sync.
  *
- *   id     stable unique slug — the localStorage key, so don't rename casually
- *   deck   category, used for the filter chips
- *   q      front (question) — may contain inline HTML (e.g. <code>)
- *   a      back (answer)    — may contain inline HTML
- *
- * Mirrors the facts in patterns.html, templates.html and
- * cheatsheet.html — keep them in sync if you edit one.
+ * The UI/persistence logic lives in flashcards-engine.js. Progress is a per-card
+ * Leitner box (1..5) persisted to localStorage under "fc:box:<id>".
  */
 const CARDS = [
   // ---- Complexity ----
@@ -63,174 +61,121 @@ const CARDS = [
   { id: "js-init-minmax", deck: "JS / TS", q: "What should you initialize min / max accumulators to?", a: "<code>Infinity</code> for a running <b>min</b>, <code>-Infinity</code> for a running <b>max</b> — so the first real value always replaces the seed." },
   { id: "js-2d-copy", deck: "JS / TS", q: "How do you shallow-copy a 2D grid?", a: "<code>grid.map(row =&gt; [...row])</code>. A plain <code>[...grid]</code> copies the outer array but shares the inner row references." },
 
-  // ---- System Design ----
-  { id: "sd-latency-throughput", deck: "System Design", q: "Latency vs throughput — define both.", a: "<b>Latency</b> = time for one operation (how fast). <b>Throughput</b> = operations per unit time (how many). You can improve one at the expense of the other (e.g. batching raises throughput, hurts latency)." },
-  { id: "sd-cap", deck: "System Design", q: "State the CAP theorem.", a: "Under a network <b>partition (P)</b>, a distributed system can guarantee either <b>consistency (C)</b> or <b>availability (A)</b>, not both. No partition → you can have both." },
-  { id: "sd-sql-nosql", deck: "System Design", q: "When do you reach for NoSQL over a relational DB?", a: "Massive scale / horizontal sharding, flexible or evolving schema, simple access patterns (key lookups), high write throughput. Relational wins for complex queries, joins, and strong ACID transactions." },
-  { id: "sd-acid", deck: "System Design", q: "What does <b>ACID</b> stand for?", a: "<b>A</b>tomicity, <b>C</b>onsistency, <b>I</b>solation, <b>D</b>urability — the guarantees of a reliable transactional database." },
-  { id: "sd-cache-strategies", deck: "System Design", q: "Name the common caching read strategy and a write strategy.", a: "Read: <b>cache-aside</b> (lazy load on miss). Writes: <b>write-through</b> (write cache + DB together) or <b>write-back</b> (write cache, flush to DB later — faster but riskier)." },
-  { id: "sd-consistent-hashing", deck: "System Design", q: "What problem does <b>consistent hashing</b> solve?", a: "Distributing keys across nodes so that <b>adding/removing a node</b> only remaps a small fraction of keys (~1/N) instead of nearly all of them — minimizes reshuffling when the cluster scales." },
-  { id: "sd-load-balancer", deck: "System Design", q: "What does a load balancer do, and name two algorithms.", a: "Distributes incoming requests across backend servers (and removes unhealthy ones). Algorithms: <b>round-robin</b>, <b>least-connections</b>, hash/IP-based, weighted." },
-  { id: "sd-message-queue", deck: "System Design", q: "Why put a <b>message queue</b> between services?", a: "Decoupling + <b>async</b> processing: smooths traffic spikes (buffer), lets the producer not wait on the consumer, enables retries and fan-out (pub/sub). Trades immediacy for resilience and scalability." },
+  // ---- Week 1: Fundamentals ----
+  { id: "w1-latency-throughput", deck: "SD1 Fundamentals", q: "Latency vs throughput — define both, and name a technique that trades one for the other.", a: "<b>Latency</b> = time for one operation (what a user feels). <b>Throughput</b> = operations per unit time (what the system sustains). <b>Batching</b> raises throughput but adds latency." },
+  { id: "w1-nines", deck: "SD1 Fundamentals", q: "How much downtime per year is 99.9%? And 99.99%?", a: "<b>99.9%</b> (three nines) ≈ <b>8.8 hours</b>/year. <b>99.99%</b> ≈ <b>53 minutes</b>/year. Each extra nine cuts downtime 10×, and roughly 10×es the engineering effort." },
+  { id: "w1-sla-slo-sli", deck: "SD1 Fundamentals", q: "SLA vs SLO vs SLI?", a: "<b>SLA</b> = the external promise to customers (often with penalties). <b>SLO</b> = your internal target. <b>SLI</b> = the actual measured metric. SLI is measured against SLO; SLO backs the SLA." },
+  { id: "w1-vert-horiz", deck: "SD1 Fundamentals", q: "Vertical vs horizontal scaling — tradeoff of each?", a: "<b>Vertical</b> (bigger machine): simple, but a hard ceiling + single point of failure. <b>Horizontal</b> (more machines): near-unlimited, but adds load balancing, partitioning, and consistency complexity." },
+  { id: "w1-stateless", deck: "SD1 Fundamentals", q: "Why keep app servers <b>stateless</b>?", a: "Any instance can serve any request → trivial horizontal scaling, failover, and deploys. Push state down into shared stores (DB / Redis / queues). Stateful servers need sticky sessions and careful partitioning." },
+  { id: "w1-latency-numbers", deck: "SD1 Fundamentals", q: "Rough latencies: RAM reference, SSD random read, same-DC round trip, cross-ocean round trip?", a: "RAM ~<b>100 ns</b> · SSD ~<b>100 µs</b> · same datacenter ~<b>0.5 ms</b> · cross-ocean ~<b>150 ms</b>. Morals: memory ≫ disk, network hops are expensive — cache and stay in-region." },
+  { id: "w1-qps-math", deck: "SD1 Fundamentals", q: "Back-of-envelope: 100M DAU × 2 writes/day → average and peak QPS?", a: "200M ÷ 86,400 ≈ <b>~2,300/sec</b> average; peak ≈ 2–3× → <b>~5–7k/sec</b>. (1 day ≈ 10⁵ seconds is the constant to memorize.)" },
+  { id: "w1-framework", deck: "SD1 Fundamentals", q: "Recite the 6-step interview framework.", a: "1) <b>Clarify</b> requirements → 2) <b>Estimate</b> (QPS/storage/bandwidth) → 3) <b>API design</b> → 4) <b>High-level design</b> → 5) <b>Deep dive</b> 1–2 components → 6) <b>Bottlenecks &amp; tradeoffs</b> at 10×." },
+
+  // ---- Week 2: Networking & APIs ----
+  { id: "w2-proxies", deck: "SD2 Networking & APIs", q: "Forward proxy vs reverse proxy?", a: "<b>Forward</b> sits in front of <b>clients</b> (hides them; egress filtering). <b>Reverse</b> sits in front of <b>servers</b> (hides the fleet; TLS termination, caching, rate limiting, routing). A load balancer is a reverse proxy specialized for distribution." },
+  { id: "w2-l4-l7", deck: "SD2 Networking & APIs", q: "L4 vs L7 load balancer?", a: "<b>L4</b> sees only IP+port, routes per <b>connection</b> — fast and cheap. <b>L7</b> parses HTTP, routes per <b>request</b> (by path/header/cookie), can terminate TLS — smarter but more CPU." },
+  { id: "w2-lb-algos", deck: "SD2 Networking & APIs", q: "When does <b>least-connections</b> beat round-robin?", a: "When request costs are <b>uneven</b> — long-lived or expensive requests pile up on some servers; least-connections routes new traffic to the least-busy server. Round-robin assumes uniform work." },
+  { id: "w2-idempotency", deck: "SD2 Networking & APIs", q: "Why does a payment POST need an <b>idempotency key</b>?", a: "POST isn't idempotent; a client retry (timeout, flaky network) would <b>charge twice</b>. The key lets the server detect the duplicate and return the original result instead of re-executing." },
+  { id: "w2-pagination", deck: "SD2 Networking & APIs", q: "Offset vs cursor pagination — why do feeds use cursors?", a: "<b>Offset</b> gets slow at depth (scan-and-skip) and skips/duplicates items when rows are inserted mid-scroll. <b>Cursor</b> (\"after item X\") is O(1) and stable under writes." },
+  { id: "w2-rest-grpc-graphql", deck: "SD2 Networking & APIs", q: "REST vs gRPC vs GraphQL — default use case for each?", a: "<b>REST</b>: public APIs (simple, cacheable, universal). <b>gRPC</b>: internal service-to-service (binary protobuf, HTTP/2, typed contracts, streaming). <b>GraphQL</b>: diverse frontends that need exact fields in one round trip." },
+  { id: "w2-push-tech", deck: "SD2 Networking & APIs", q: "Long polling vs WebSockets vs SSE — when each?", a: "<b>WebSockets</b>: full-duplex real-time (chat, games). <b>SSE</b>: server→client only (feeds, tickers) — simpler, auto-reconnects. <b>Long polling</b>: near-real-time without special infra; server holds the request until data arrives." },
+  { id: "w2-status-codes", deck: "SD2 Networking & APIs", q: "Status codes: 401 vs 403? 429? 503?", a: "<b>401</b> unauthenticated (who are you?) vs <b>403</b> unauthorized (I know you; you can't). <b>429</b> rate-limited. <b>503</b> temporarily overloaded/down (vs 500 = server bug)." },
+
+  // ---- Week 3: Databases ----
+  { id: "w3-sql-vs-nosql", deck: "SD3 Databases", q: "Give one workload where relational wins and one where NoSQL wins.", a: "<b>Relational</b>: orders/payments — joins, constraints, multi-row ACID transactions. <b>NoSQL</b>: massive append-only event streams or session/key-value data — horizontal write scale, simple access patterns, flexible schema." },
+  { id: "w3-index", deck: "SD3 Databases", q: "What does a B-tree index make fast, and what does it cost?", a: "O(log n) <b>lookups and range scans</b> on the indexed columns instead of O(n) table scans. Cost: every <b>write maintains every index</b> (slower inserts/updates) + extra disk." },
+  { id: "w3-composite", deck: "SD3 Databases", q: "Index on <code>(user_id, created_at)</code> — which queries can it serve?", a: "Filter by <b>user_id</b>, or by <b>user_id + created_at</b> (incl. range/sort). It <b>cannot</b> serve a filter on created_at alone — <b>leftmost-prefix rule</b>: a composite index works left to right." },
+  { id: "w3-acid", deck: "SD3 Databases", q: "Spell out ACID.", a: "<b>A</b>tomicity (all or nothing) · <b>C</b>onsistency (constraints hold) · <b>I</b>solation (concurrent txns don't see partial work) · <b>D</b>urability (committed survives crash, via write-ahead log)." },
+  { id: "w3-base", deck: "SD3 Databases", q: "What is BASE, and what is it optimizing for?", a: "<b>B</b>asically <b>A</b>vailable, <b>S</b>oft state, <b>E</b>ventually consistent — the NoSQL counterpoint to ACID. Optimizes for <b>availability and scale</b>: answer every request, even if not with the very latest value." },
+  { id: "w3-denorm", deck: "SD3 Databases", q: "When is <b>denormalization</b> the right call, and what's the price?", a: "Read-heavy systems at scale: copy data to where it's read (author_name on the post) to kill joins. Price: writes must update <b>every copy</b>, and copies can drift. Normalize for correctness, denormalize for read scale." },
+  { id: "w3-snowflake", deck: "SD3 Databases", q: "Why do sharded systems use Snowflake-style IDs instead of auto-increment?", a: "Auto-increment needs central coordination and collides across shards. <b>Snowflake</b> = timestamp + machine ID + sequence → globally unique with no coordination, and <b>roughly time-sorted</b> — great for feeds and pagination." },
+
+  // ---- Week 4: Caching, CDN & Replication ----
+  { id: "w4-cache-aside", deck: "SD4 Caching & CDN", q: "Walk through <b>cache-aside</b>.", a: "App reads the cache → on <b>miss</b>, reads the DB and <b>fills the cache</b> (with a TTL) → next reads hit. The default strategy: only hot data gets cached; the app owns the logic." },
+  { id: "w4-write-strats", deck: "SD4 Caching & CDN", q: "Write-through vs write-back — which risks data loss?", a: "<b>Write-through</b>: write cache+DB synchronously — safe, slower writes. <b>Write-back</b>: write cache only, flush later — fastest, but <b>loses data</b> if the cache dies before flushing." },
+  { id: "w4-invalidation", deck: "SD4 Caching & CDN", q: "On a DB update, why <b>delete</b> the cache key instead of updating it?", a: "Two concurrent updates can write the cache <b>out of order</b>, leaving stale data forever. Delete-on-write is race-safe: next read misses and refills from the fresh DB row." },
+  { id: "w4-stampede", deck: "SD4 Caching & CDN", q: "What's a cache stampede (thundering herd), and two fixes?", a: "A hot key expires → thousands of requests hit the DB at once. Fixes: <b>per-key lock</b> (one request recomputes, rest wait) or <b>staggered/soft TTLs</b> (refresh before hard expiry)." },
+  { id: "w4-penetration", deck: "SD4 Caching & CDN", q: "Requests for keys that <b>don't exist</b> keep hitting the DB — fixes?", a: "Cache penetration. Fixes: <b>cache the negative result</b> (\"no such key\", short TTL) or put a <b>Bloom filter</b> in front — \"definitely not present\" skips the DB entirely." },
+  { id: "w4-cdn", deck: "SD4 Caching & CDN", q: "Pull vs push CDN?", a: "<b>Pull</b> (default): edge fetches from origin on first miss, caches per Cache-Control — easy, first request per region slow. <b>Push</b>: you upload ahead of time — for big predictable releases (video). Cache-bust with hashed filenames + immutable TTL." },
+  { id: "w4-replication", deck: "SD4 Caching & CDN", q: "Leader-follower replication — what do you gain, and what's the classic gotcha?", a: "Writes → leader; followers replicate and serve reads → <b>read scaling + failover</b>. Gotcha: async replication → <b>lag</b>; a user's fresh write can be invisible on a replica. Fix: <b>read-your-own-writes</b> (pin reads to leader briefly after a write)." },
+
+  // ---- Week 5: Sharding & Consistent Hashing ----
+  { id: "w5-why-shard", deck: "SD5 Sharding", q: "What forces sharding — and which of the three can't read replicas fix?", a: "Data too big for one node, working set &gt; RAM, or <b>write throughput</b> — replicas only scale <b>reads</b>; every write still hits the leader. Shard as late as possible." },
+  { id: "w5-range-hash", deck: "SD5 Sharding", q: "Range vs hash partitioning — core tradeoff?", a: "<b>Range</b>: range scans stay on one shard, but sequential/new keys <b>hotspot</b> the last shard. <b>Hash</b>: even spread, but range queries become <b>scatter-gather</b> across all shards." },
+  { id: "w5-shard-key", deck: "SD5 Sharding", q: "What makes a good shard key?", a: "(1) Spreads data <b>and traffic</b> evenly, (2) the common query lands on <b>one shard</b>. E.g. user_id for user-centric reads. Queries missing the key go scatter-gather — or need a separate <b>global index table</b>." },
+  { id: "w5-mod-n", deck: "SD5 Sharding", q: "Why does <code>hash(key) % N</code> break when N changes, and what fixes it?", a: "Changing N remaps <b>nearly every key</b> → full reshuffle / cache-miss storm. <b>Consistent hashing</b>: nodes and keys on a ring, key → first node clockwise; adding a node moves only <b>~1/N</b> of keys." },
+  { id: "w5-vnodes", deck: "SD5 Sharding", q: "What do <b>virtual nodes</b> buy on the hash ring?", a: "Each physical node = 100–200 ring points → (1) <b>even distribution</b> (no lumpy arcs), (2) a dead node's load spreads across <b>everyone</b> (not one neighbor), (3) weight big machines with more vnodes." },
+  { id: "w5-celebrity", deck: "SD5 Sharding", q: "One key/user is melting its shard — four escalating fixes?", a: "1) <b>Cache</b> the hot entity. 2) <b>Replicate</b> the key, balance reads. 3) <b>Split</b> the key with random suffixes (writes spread; readers aggregate). 4) <b>Isolate</b> the whale on its own shard." },
+  { id: "w5-prealloc", deck: "SD5 Sharding", q: "Trick to make future rebalancing painless?", a: "Create <b>many more logical partitions than nodes</b> (e.g. 1024 partitions on 8 nodes). Scaling = move whole partitions to new nodes; keys never rehash individually." },
+
+  // ---- Week 6: Async & Messaging ----
+  { id: "w6-why-queue", deck: "SD6 Messaging", q: "Three benefits of a queue between services — and the price?", a: "<b>Decoupling</b> (independent deploy/failure), <b>buffering</b> (absorb spikes), <b>lower user latency</b> (respond before slow work). Price: <b>eventual consistency</b> + a new component to operate." },
+  { id: "w6-queue-vs-kafka", deck: "SD6 Messaging", q: "Queue (SQS/RabbitMQ) vs log (Kafka) — who tracks consumption?", a: "<b>Queue</b>: broker owns it — consumer acks, message is gone; competing workers. <b>Kafka</b>: consumers own an <b>offset</b> into a retained append-only log → many independent readers + <b>replay</b>." },
+  { id: "w6-delivery", deck: "SD6 Messaging", q: "Why is exactly-once delivery a myth, and what's the practical answer?", a: "Acks can be lost → the broker must redeliver (at-least-once) or risk loss (at-most-once). Practical: <b>at-least-once + idempotent consumers</b> = exactly-once <i>effect</i>." },
+  { id: "w6-idempotent", deck: "SD6 Messaging", q: "Three ways to make a consumer idempotent?", a: "1) <b>Dedupe table</b> keyed by message ID (skip if seen). 2) <b>Upserts</b> instead of inserts. 3) <b>Conditional updates</b> (\"set paid where status=pending\"). Reprocessing must be harmless." },
+  { id: "w6-dlq", deck: "SD6 Messaging", q: "What is a dead-letter queue for?", a: "After N failed attempts, park the message aside so a <b>poison message</b> can't block the pipeline or retry forever. Alert on DLQ size; inspect and <b>replay after the fix</b>." },
+  { id: "w6-ordering", deck: "SD6 Messaging", q: "How do you get per-user ordering at scale?", a: "<b>Partition by user_id</b> — all of one user's events land in one partition, consumed sequentially by one consumer. Global ordering doesn't scale; per-key ordering does." },
+  { id: "w6-backpressure", deck: "SD6 Messaging", q: "What metric says consumers are drowning, and what do you do?", a: "<b>Queue depth / consumer lag</b> growing without bound. Respond: autoscale consumers, rate-limit producers, or shed low-priority load. Retries need <b>exponential backoff + jitter</b> or they amplify the outage." },
+
+  // ---- Week 7: Shortener & Rate Limiter ----
+  { id: "w7-base62", deck: "SD7 Shortener & Limiter", q: "TinyURL: why base62, and how many 7-char keys exist?", a: "<b>Base62</b> = [a-z A-Z 0-9] — URL-safe without punctuation. 62⁷ ≈ <b>3.5 trillion</b> keys — 7 chars is enough forever." },
+  { id: "w7-kgs", deck: "SD7 Shortener & Limiter", q: "What does the <b>Key Generation Service</b> remove from the write path?", a: "Collision checking and coordination: keys are <b>pre-generated</b>; app servers grab <b>batches</b> (e.g. 10k) offline. Write = plain insert with a guaranteed-unique key. Lost batches on crash are irrelevant — the space is huge." },
+  { id: "w7-301-302", deck: "SD7 Shortener & Limiter", q: "301 vs 302 for the redirect — the tradeoff?", a: "<b>301</b> (permanent): browsers cache it → your server stops seeing repeat clicks → <b>no analytics</b>, but less load. <b>302</b>: every click hits you → analytics preserved. Most shorteners choose <b>302</b>." },
+  { id: "w7-shortener-arch", deck: "SD7 Shortener & Limiter", q: "Why is TinyURL 'really a caching problem', and where does analytics go?", a: "Reads outnumber writes ~100:1 and the payload is one tiny row → <b>cache-aside Redis on short→long</b> serves ~all redirects. Analytics: <b>publish a click event to a queue</b>, aggregate async — never write on the redirect path." },
+  { id: "w7-token-bucket", deck: "SD7 Shortener & Limiter", q: "Token bucket: what do B and R control, and why is it the default answer?", a: "Bucket holds <b>B</b> tokens (max burst), refills at <b>R</b>/sec (sustained rate); request takes a token or gets 429. O(1) memory ({tokens, last_refill}), allows natural bursts — the standard recommendation." },
+  { id: "w7-fixed-window", deck: "SD7 Shortener & Limiter", q: "Why does fixed-window rate limiting allow 2× bursts?", a: "Counters reset at the boundary: 100 requests at 0:59 + 100 at 1:01 = <b>200 in ~2 seconds</b>, yet both windows pass. Fix: <b>sliding window counter</b> (weighted blend of adjacent windows) or token bucket." },
+  { id: "w7-distributed-rl", deck: "SD7 Shortener & Limiter", q: "Distributed rate limiting: where does state live, and what's the atomicity trap?", a: "Shared <b>Redis</b> so all API servers see one counter. The read-modify-write must be <b>atomic</b> (INCR or a Lua script) — otherwise concurrent requests both pass the check. Decide <b>fail-open</b> (user APIs) vs <b>fail-closed</b> (login/abuse) if Redis dies." },
+
+  // ---- Week 8: Feeds ----
+  { id: "w8-fanout", deck: "SD8 Feeds", q: "Fan-out on write vs fan-out on read — cost of each?", a: "<b>Write (push)</b>: on post, insert into every follower's precomputed feed — reads are one cache hit; cost lands on (async) write time. <b>Read (pull)</b>: store once; every feed load fetches+merges from all followees — cost lands on read latency, the thing you promised." },
+  { id: "w8-celebrity", deck: "SD8 Feeds", q: "Why does push break for celebrities, and what's the hybrid?", a: "One post → <b>100M list inserts</b>. Hybrid: push for normal users; <b>don't fan out celebrity posts</b> — merge them in at <b>read time</b> (they're cache-hot anyway). Skip pushes to inactive users too." },
+  { id: "w8-feed-read", deck: "SD8 Feeds", q: "Walk the feed read path in the hybrid design.", a: "Redis <code>feed:{user}</code> → list of tweet <b>IDs</b> (capped ~800) → hydrate from tweet-content cache → merge recent posts from followed celebrities → return with a <b>cursor</b> for pagination." },
+  { id: "w8-two-graphs", deck: "SD8 Feeds", q: "Why store the social graph twice?", a: "Sharded by <b>follower</b> → \"who do I follow\" (feed pulls); sharded by <b>followee</b> → \"who follows me\" (fan-out on post). Each query must land on one shard, so keep an inverted copy and update both on follow." },
+  { id: "w8-media", deck: "SD8 Feeds", q: "Instagram: where do image bytes live vs the DB?", a: "Bytes in <b>object storage (S3)</b>, served via <b>CDN</b>; the DB holds <b>metadata + S3 keys only</b>. Feed fan-out pushes photo <b>IDs</b>, never media. Never store blobs in the database." },
+  { id: "w8-hot-counter", deck: "SD8 Feeds", q: "How do you count likes on a viral post without melting a DB row?", a: "A single <code>count=count+1</code> row can't take thousands of writes/sec. <b>Shard the counter</b> (N sub-rows, sum on read) or <b>buffer increments in Redis</b> and flush batches. Accept seconds-stale counts — say so." },
+
+  // ---- Week 9: Chat & Notifications ----
+  { id: "w9-websocket-state", deck: "SD9 Chat & Realtime", q: "Chat servers hold WebSockets — what's the scaling consequence?", a: "They're <b>stateful</b>: a user is reachable only via the server holding their socket. You need a <b>session registry</b> (user_id → server) for routing, and connection draining on deploys — the opposite of stateless web tier ease." },
+  { id: "w9-message-path", deck: "SD9 Chat & Realtime", q: "Trace a message A→B across chat servers.", a: "A → server-1 → <b>persist</b> → look up B in the session registry → forward to server-2 → push down B's socket. B offline? → write to B's <b>inbox/offline queue</b> + trigger a push notification; deliver on reconnect." },
+  { id: "w9-acks", deck: "SD9 Chat & Realtime", q: "The three ack levels in chat (✓, ✓✓, blue)?", a: "<b>Sent</b>: server persisted and acked to sender. <b>Delivered</b>: recipient's device acked receipt. <b>Read</b>: recipient opened the conversation. Server must persist <b>before</b> acking — an acked message can never be lost." },
+  { id: "w9-dedupe", deck: "SD9 Chat & Realtime", q: "How does chat guarantee exactly-once <i>display</i> despite retries?", a: "Sender retries until acked (<b>at-least-once</b>) → duplicates possible → every message carries a <b>client-generated ID</b>; receivers (and server) dedupe on it. Same at-least-once + idempotency pattern as queues." },
+  { id: "w9-ordering", deck: "SD9 Chat & Realtime", q: "What ordering does chat actually guarantee, and how?", a: "<b>Per-conversation</b> ordering (not global): server-assigned sequence numbers per conversation, or one Kafka partition per conversation ID. Storage: wide-column store keyed by <code>(conversation_id, seq)</code>." },
+  { id: "w9-presence", deck: "SD9 Chat & Realtime", q: "How does presence (online/last-seen) work without melting the system?", a: "Clients <b>heartbeat</b> every ~10 s; missed heartbeats → offline. Don't broadcast every flap — friends <b>fetch on chat-open</b> and subscribe only to open conversations." },
+  { id: "w9-notif", deck: "SD9 Chat & Realtime", q: "Notification system: the pipeline and the two 'don't send' jobs?", a: "Events → queue (per-channel topics) → stateless workers → APNs/FCM/email/SMS with retries+DLQ+idempotency keys. Before sending: check <b>user preferences + per-user rate caps</b>, and <b>collapse</b> similar events (\"A and 12 others liked…\")." },
+
+  // ---- Week 10: Media & Storage ----
+  { id: "w10-presigned", deck: "SD10 Media & Storage", q: "Why do clients upload video straight to object storage?", a: "Via a <b>pre-signed URL</b>, in resumable chunks — app servers never proxy gigabytes (they'd be bandwidth bottlenecks). The upload-complete event then kicks off the pipeline via a queue." },
+  { id: "w10-segments", deck: "SD10 Media & Storage", q: "Why split a video into segments before transcoding? (Two reasons)", a: "1) <b>Parallelism</b>: segments transcode simultaneously across a worker fleet — a 2-hour movie finishes in minutes. 2) <b>Adaptive bitrate</b> needs segment granularity so the player can switch quality mid-stream." },
+  { id: "w10-abr", deck: "SD10 Media & Storage", q: "How does adaptive bitrate streaming (HLS/DASH) work?", a: "Player fetches a <b>manifest</b> listing every rendition's segment URLs, then requests segments over plain HTTP, <b>picking quality per segment</b> from measured bandwidth. All cacheable HTTP → CDNs do the heavy lifting." },
+  { id: "w10-chunking", deck: "SD10 Media & Storage", q: "Dropbox: what three features fall out of content-hash chunking?", a: "Files → ~4 MB chunks IDed by <b>hash of content</b>: 1) <b>delta sync</b> (only changed chunks upload), 2) <b>dedup</b> (known hash = don't store twice), 3) <b>resumable transfers</b> (+ cheap versioning, since chunks are immutable)." },
+  { id: "w10-planes", deck: "SD10 Media & Storage", q: "Data plane vs control plane in storage systems?", a: "<b>Data plane</b>: huge, dumb, immutable bytes (chunks/segments) on object storage + CDN — trivially scalable, eventual is fine. <b>Control plane</b>: small, smart <b>metadata</b> (file→chunk list, versions, ACLs) in a consistent DB. YouTube, Dropbox, S3 all decompose this way." },
+  { id: "w10-conflict", deck: "SD10 Media & Storage", q: "Two devices edit the same file offline — what does Dropbox do?", a: "Don't merge, don't drop: the first commit wins; the second becomes a <b>conflicted copy</b> saved alongside. Conflict is detected at metadata commit (version mismatch). Humans resolve; the system just never loses data." },
+
+  // ---- Week 11: Geo & Search ----
+  { id: "w11-btree-fail", deck: "SD11 Geo & Search", q: "Why can't a B-tree index answer 'nearest 10 drivers'?", a: "A B-tree narrows <b>one dimension</b>; lat/lng box queries scan huge candidate sets. You need a <b>spatial index</b> mapping 2D → 1D cells: geohash, quadtree, S2/H3." },
+  { id: "w11-geohash", deck: "SD11 Geo & Search", q: "Geohash: the idea and the border gotcha?", a: "Interleave lat/lng bits → base32 string; longer prefix = smaller cell, nearby points share prefixes → prefix search works in Redis. Gotcha: neighbors across a cell <b>border</b> don't share a prefix — always query the cell <b>+ 8 neighbors</b>." },
+  { id: "w11-quadtree", deck: "SD11 Geo & Search", q: "Quadtree vs geohash — when does quadtree shine?", a: "It splits recursively until each leaf holds ≤ K points → <b>adapts to density</b> (tiny cells in Manhattan, huge in Nevada). Great for mostly-static data like Yelp businesses; geohash's fixed grid is simpler for live drivers in Redis." },
+  { id: "w11-uber-ram", deck: "SD11 Geo & Search", q: "Why does Uber's live driver index live in RAM, unpersisted?", a: "Millions of location pings/sec that are <b>stale in seconds</b> — durability buys nothing. If the index dies it <b>rebuilds from fresh pings in seconds</b>. Persist trips/payments; keep ephemeral state ephemeral. Shard by city — queries are local." },
+  { id: "w11-trie", deck: "SD11 Geo & Search", q: "Typeahead: what's stored at each trie node, and why?", a: "The <b>precomputed top-K completions</b> for that prefix. A query = walk L characters + return the stored list — O(L), zero ranking at query time. All ranking work moved offline to build time." },
+  { id: "w11-trie-rebuild", deck: "SD11 Geo & Search", q: "Why rebuild the typeahead trie offline instead of updating counts per query?", a: "Serving stays <b>read-only and lock-free</b> at enormous QPS. Log queries → aggregate offline → rebuild + <b>hot-swap</b> periodically. Shard the trie by prefix range; cache 1–3-char prefixes (they dominate traffic). Trending terms get a fast lane." },
+
+  // ---- Week 12: Advanced ----
+  { id: "w12-cap", deck: "SD12 Advanced", q: "CAP in one sentence — then apply it to a payment ledger vs a view counter.", a: "During a <b>partition</b>, choose consistency (refuse requests) or availability (serve possibly-stale). Ledger = <b>CP</b> (wrong balance is worse than an error); view counter = <b>AP</b> (stale count is harmless). It's per-<i>operation</i>, not per-company." },
+  { id: "w12-pacelc", deck: "SD12 Advanced", q: "What does PACELC add to CAP?", a: "If <b>P</b>artition → A vs C; <b>E</b>lse (healthy network) → <b>L</b>atency vs <b>C</b>onsistency. Even with zero failures, strong consistency costs coordination round trips on every request." },
+  { id: "w12-models", deck: "SD12 Advanced", q: "Order these: eventual, linearizable, causal, read-your-own-writes — and give one use each.", a: "<b>Linearizable</b> (balances, locks) &gt; <b>causal</b> (reply never precedes its post) &gt; <b>read-your-own-writes</b> (see your own profile edit) &gt; <b>eventual</b> (like counts, DNS). Weaker = faster + more available; pick per data type." },
+  { id: "w12-quorum", deck: "SD12 Advanced", q: "Why does R + W &gt; N guarantee fresh reads?", a: "Any read set of R replicas must <b>overlap</b> any write set of W (pigeonhole) → at least one replica in every read holds the newest write. N=3, W=2, R=2 is the balanced classic." },
+  { id: "w12-raft", deck: "SD12 Advanced", q: "How does majority voting prevent split-brain?", a: "Leader election and commits require a <b>majority</b>; two disjoint majorities can't exist, so during a partition the minority side can elect no leader and commit nothing. Failure detection = <b>heartbeats</b> + randomized election timeouts (Raft)." },
+  { id: "w12-bloom", deck: "SD12 Advanced", q: "What can a Bloom filter never tell you?", a: "That an item is <b>definitely present</b> — it answers \"definitely NOT present\" or \"probably present\" (tunable false-positive rate), in tiny memory, no false negatives. Uses: skip pointless disk lookups (LSM stores), cache-penetration shield, username-taken pre-check." },
+  { id: "w12-breaker", deck: "SD12 Advanced", q: "Circuit breaker — how it works and what it prevents.", a: "After N consecutive failures to a dependency: <b>open</b> → fail fast (no calls) for a cooldown → <b>half-open</b> probe → close on success. Prevents <b>cascading failure</b>: threads not stuck waiting on a dead service, and the sick service gets air to recover." },
+  { id: "w12-retry", deck: "SD12 Advanced", q: "When do retries make an outage worse, and the two-word fix?", a: "Synchronized immediate retries <b>multiply load</b> on an already-struggling service (retry storm = self-DDoS). Fix: <b>backoff + jitter</b> (exponential delays, randomized) — and only retry <b>idempotent</b> operations." },
+  { id: "w12-shedding", deck: "SD12 Advanced", q: "Graceful degradation vs load shedding?", a: "<b>Degradation</b>: serve a lesser experience (cached feed when the feed service is down). <b>Shedding</b>: drop low-priority work (analytics) to protect user-facing traffic. Decide the sacrifice order <b>in advance</b>, not mid-incident." },
 ];
 
-(function () {
-  "use strict";
-
-  const BOX_PREFIX = "fc:box:";
-  const MAX_BOX = 5;
-
-  // ---- persistence ----
-  const getBox = (id) => {
-    const v = parseInt(localStorage.getItem(BOX_PREFIX + id), 10);
-    return Number.isFinite(v) && v >= 1 && v <= MAX_BOX ? v : 1;
-  };
-  const setBox = (id, box) =>
-    localStorage.setItem(BOX_PREFIX + id, String(Math.min(MAX_BOX, Math.max(1, box))));
-
-  // ---- state ----
-  const DECKS = ["All", ...Array.from(new Set(CARDS.map((c) => c.deck)))];
-  let activeDeck = "All";
-  let order = [];      // indices into the active deck's card list
-  let view = [];       // the filtered card list
-  let pos = 0;
-  let flipped = false;
-
-  // ---- elements ----
-  const el = (id) => document.getElementById(id);
-  const cardEl = el("fc-card");
-  const qEl = el("fc-question");
-  const aEl = el("fc-answer");
-  const counterEl = el("fc-counter");
-  const boxFrontEl = el("fc-box-front");
-  const kickerFrontEl = el("fc-kicker-front");
-  const progressEl = el("fc-progress");
-  const summaryEl = el("fc-summary");
-  const decksEl = el("fc-decks");
-
-  function shuffle(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
+// One-time migration: the SD decks briefly lived on their own page, saved under "sdfc:box:".
+for (const c of CARDS) {
+  const old = localStorage.getItem("sdfc:box:" + c.id);
+  if (old !== null) {
+    if (localStorage.getItem("fc:box:" + c.id) === null) localStorage.setItem("fc:box:" + c.id, old);
+    localStorage.removeItem("sdfc:box:" + c.id);
   }
-
-  function buildDeckChips() {
-    decksEl.innerHTML = "";
-    DECKS.forEach((name) => {
-      const n = name === "All" ? CARDS.length : CARDS.filter((c) => c.deck === name).length;
-      const btn = document.createElement("button");
-      btn.innerHTML = `${name} <span class="count">${n}</span>`;
-      if (name === activeDeck) btn.classList.add("active");
-      btn.addEventListener("click", () => selectDeck(name));
-      decksEl.appendChild(btn);
-    });
-  }
-
-  function selectDeck(name) {
-    activeDeck = name;
-    view = name === "All" ? CARDS.slice() : CARDS.filter((c) => c.deck === name);
-    order = view.map((_, i) => i);
-    // Surface least-mastered cards first, then shuffle within equal boxes.
-    shuffle(order);
-    order.sort((a, b) => getBox(view[a].id) - getBox(view[b].id));
-    pos = 0;
-    flipped = false;
-    buildDeckChips();
-    render();
-  }
-
-  function currentCard() {
-    if (!view.length) return null;
-    return view[order[pos]];
-  }
-
-  function render() {
-    const card = currentCard();
-    cardEl.classList.toggle("flipped", flipped);
-
-    if (!card) {
-      qEl.textContent = "No cards in this deck.";
-      aEl.textContent = "";
-      counterEl.textContent = "0 / 0";
-      boxFrontEl.textContent = "";
-      updateSummary();
-      return;
-    }
-
-    kickerFrontEl.textContent = card.deck;
-    qEl.innerHTML = card.q;
-    aEl.innerHTML = card.a;
-    const box = getBox(card.id);
-    boxFrontEl.innerHTML = box >= MAX_BOX ? "🏆 <b>Mastered</b>" : `Box <b>${box}</b> / ${MAX_BOX}`;
-    counterEl.textContent = `${pos + 1} / ${view.length}`;
-    updateSummary();
-  }
-
-  function updateSummary() {
-    const total = view.length;
-    const mastered = view.filter((c) => getBox(c.id) >= MAX_BOX).length;
-    const pct = total ? Math.round((mastered / total) * 100) : 0;
-    progressEl.style.width = pct + "%";
-    summaryEl.innerHTML = total
-      ? `<b>${mastered}</b> / ${total} mastered in <b>${activeDeck}</b> &nbsp;·&nbsp; ${pct}%`
-      : "No cards.";
-  }
-
-  function flip() {
-    if (!currentCard()) return;
-    flipped = !flipped;
-    cardEl.classList.toggle("flipped", flipped);
-  }
-
-  function go(delta) {
-    if (!view.length) return;
-    pos = (pos + delta + view.length) % view.length;
-    flipped = false;
-    render();
-  }
-
-  // Rate the current card, then advance.
-  function rate(correct) {
-    const card = currentCard();
-    if (!card) return;
-    setBox(card.id, correct ? getBox(card.id) + 1 : 1);
-    // small delay so the user sees the box update on the front face
-    flipped = false;
-    cardEl.classList.remove("flipped");
-    if (view.length > 1) {
-      go(1);
-    } else {
-      render();
-    }
-  }
-
-  // ---- wiring ----
-  cardEl.addEventListener("click", flip);
-  el("fc-prev").addEventListener("click", () => go(-1));
-  el("fc-next").addEventListener("click", () => go(1));
-  el("fc-again").addEventListener("click", () => rate(false));
-  el("fc-good").addEventListener("click", () => rate(true));
-  el("fc-shuffle").addEventListener("click", () => { shuffle(order); pos = 0; flipped = false; render(); });
-  el("fc-reset").addEventListener("click", () => {
-    if (!confirm("Clear all flashcard progress? This resets every card to box 1.")) return;
-    CARDS.forEach((c) => localStorage.removeItem(BOX_PREFIX + c.id));
-    selectDeck(activeDeck);
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (e.target.matches("input, textarea")) return;
-    switch (e.key) {
-      case " ": e.preventDefault(); flip(); break;
-      case "ArrowRight": go(1); break;
-      case "ArrowLeft": go(-1); break;
-      case "1": rate(false); break;
-      case "2": rate(true); break;
-      case "s": case "S": shuffle(order); pos = 0; flipped = false; render(); break;
-    }
-  });
-
-  // ---- init ----
-  selectDeck("All");
-})();
+}

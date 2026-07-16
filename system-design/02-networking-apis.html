@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Networking &amp; APIs</title>
+<link rel="stylesheet" href="../study-plan/style.css">
+</head>
+<body>
+<nav><div class="inner">
+  <a href="../study-plan/index.html">Overview</a>
+  <a href="../study-plan/system-design-curriculum.html">SD Curriculum</a>
+  <a href="index.html" class="active">SD Notes</a>
+  <a href="../study-plan/patterns.html">Patterns</a>
+  <a href="../study-plan/templates.html">Templates</a>
+  <a href="../study-plan/cheatsheet.html">JS Cheatsheet</a>
+  <a href="../study-plan/flashcards.html">Flashcards</a>
+  <a href="../study-plan/playground.html">Playground</a>
+</div></nav>
+<div class="wrap">
+
+<p class="subtitle"><a href="index.html">← All topics</a></p>
+<h1>Week 2 — Networking, Load Balancing &amp; APIs</h1>
+<p class="subtitle">How a request actually travels, how you spread traffic across machines, and how services talk to each other. By end of week: sketch the full path browser → DNS → LB → server, pick L4 vs L7 with a reason, and design a clean REST API.</p>
+
+<h2>1. Life of a request</h2>
+<ol>
+<li><strong>DNS lookup:</strong> browser resolves <code>example.com</code> → IP. Cached at browser, OS, resolver, and authoritative levels (TTL controls staleness). DNS itself is a giant distributed, eventually-consistent database.</li>
+<li><strong>TCP handshake</strong> (SYN / SYN-ACK / ACK), then <strong>TLS handshake</strong> for HTTPS — each is round trips, which is why connection reuse (keep-alive) matters.</li>
+<li><strong>HTTP request</strong> hits an edge (CDN / reverse proxy / load balancer), which routes to an app server.</li>
+<li>Response flows back; the browser renders.</li>
+</ol>
+<ul>
+<li><strong>HTTP/1.1:</strong> one request at a time per connection (head-of-line blocking) → browsers open ~6 connections.</li>
+<li><strong>HTTP/2:</strong> multiplexes many streams over one TCP connection; header compression.</li>
+<li><strong>HTTP/3 (QUIC):</strong> runs on UDP; removes TCP head-of-line blocking; faster handshakes.</li>
+</ul>
+
+<h2>2. Proxies</h2>
+<ul>
+<li><strong>Forward proxy:</strong> sits in front of <em>clients</em> — hides the client from the server (corporate egress, filtering, anonymity).</li>
+<li><strong>Reverse proxy:</strong> sits in front of <em>servers</em> — hides the fleet from clients. Does TLS termination, compression, caching, rate limiting, routing (nginx, Envoy, HAProxy).</li>
+<li>A load balancer is a reverse proxy whose main job is <strong>distribution</strong>; most real deployments combine the roles.</li>
+</ul>
+
+<h2>3. Load balancing</h2>
+<table>
+<tr><th></th><th>L4 (transport)</th><th>L7 (application)</th></tr>
+<tr><td>Sees</td><td>IP + port only</td><td>Full HTTP: path, headers, cookies</td></tr>
+<tr><td>Routing</td><td>Per connection</td><td>Per request — can route <code>/api</code> vs <code>/video</code> to different pools</td></tr>
+<tr><td>Speed / cost</td><td>Faster, cheaper</td><td>Smarter, more CPU (parses HTTP, terminates TLS)</td></tr>
+<tr><td>Examples</td><td>AWS NLB, IPVS</td><td>AWS ALB, nginx, Envoy</td></tr>
+</table>
+<ul>
+<li><strong>Algorithms:</strong> round-robin (default), weighted round-robin (uneven servers), <strong>least connections</strong> (uneven request cost), IP/URL hash (stickiness or cache locality).</li>
+<li><strong>Health checks</strong> pull dead servers out of rotation — this is what turns redundancy into availability.</li>
+<li>LBs exist at every tier: DNS → edge LB → service-to-service LB. The LB itself must not be a single point of failure (active-passive pair, or anycast).</li>
+<li><strong>Sticky sessions</strong> pin a user to one server — avoid if you can; keep servers stateless and put session state in Redis instead.</li>
+</ul>
+
+<h2>4. REST API design</h2>
+<ul>
+<li>Resources are <strong>nouns</strong>, methods are <strong>verbs</strong>: <code>GET /users/123/orders</code>, not <code>GET /getUserOrders?id=123</code>.</li>
+<li><strong>Idempotency:</strong> GET, PUT, DELETE are idempotent (safe to retry); POST is not — for payments/orders, accept an <strong>idempotency key</strong> header so retries don't double-charge.</li>
+<li><strong>Pagination:</strong> offset (<code>?page=3</code>) is simple but slow at depth and skips/dupes under writes; <strong>cursor-based</strong> (<code>?after=eyJpZCI6...</code>) is stable and O(1) — use it for feeds.</li>
+<li><strong>Versioning:</strong> <code>/v1/...</code> in the path is the pragmatic default.</li>
+<li><strong>Status codes:</strong> 200 OK, 201 Created, 400 bad input, 401 unauthenticated, 403 unauthorized, 404 not found, 409 conflict, 429 rate-limited, 500 server bug, 503 overloaded.</li>
+</ul>
+
+<h2>5. REST vs gRPC vs GraphQL</h2>
+<table>
+<tr><th></th><th>REST</th><th>gRPC</th><th>GraphQL</th></tr>
+<tr><td>Format</td><td>JSON over HTTP</td><td>Protobuf (binary) over HTTP/2</td><td>Query language over HTTP</td></tr>
+<tr><td>Strength</td><td>Simple, universal, cacheable</td><td>Fast, typed contracts, streaming</td><td>Client picks exact fields; one round trip for nested data</td></tr>
+<tr><td>Weakness</td><td>Over/under-fetching</td><td>Not browser-native; harder to debug</td><td>Caching hard; server complexity; N+1 queries</td></tr>
+<tr><td>Use for</td><td>Public APIs</td><td>Internal service-to-service</td><td>Diverse frontend clients (mobile + web)</td></tr>
+</table>
+
+<h2>6. Server push: polling vs long-polling vs WebSockets vs SSE</h2>
+<p>How does the server tell the client something happened? (Shows up in chat, notifications, live dashboards.)</p>
+<table>
+<tr><th>Technique</th><th>How</th><th>Tradeoff</th></tr>
+<tr><td><strong>Short polling</strong></td><td>Client asks every N seconds</td><td>Simple; wasteful; up to N sec latency</td></tr>
+<tr><td><strong>Long polling</strong></td><td>Server holds the request open until data arrives, then client re-requests</td><td>Near-real-time without special protocols; one held connection per client</td></tr>
+<tr><td><strong>WebSockets</strong></td><td>Persistent, full-duplex TCP connection</td><td>True two-way real-time (chat, games); stateful — harder to load-balance and scale</td></tr>
+<tr><td><strong>SSE</strong></td><td>Server-to-client one-way stream over HTTP</td><td>Simpler than WS when the client never pushes (feeds, tickers); auto-reconnect built in</td></tr>
+</table>
+<div class="callout tip">
+<strong>Interview default:</strong> chat / collaborative editing → WebSockets. Notifications / live scores → SSE or long polling. "Check occasionally" → polling. Say the tradeoff out loud: persistent connections cost memory per client and make servers stateful.
+</div>
+
+<div class="callout">
+<strong>Exercise:</strong> Design the REST API for a pastebin: create paste (with optional expiry + custom alias), fetch paste, delete paste. Specify endpoints, methods, status codes, and how you'd paginate a user's paste list. Then decide: where does a load balancer go, L4 or L7, and which algorithm?
+</div>
+
+<h2>Self-check</h2>
+<div class="card">
+<ul>
+<li>Can I narrate the full path of an HTTPS request, including where caching happens?</li>
+<li>Forward vs reverse proxy — which faces whom?</li>
+<li>When would I pick least-connections over round-robin?</li>
+<li>Why are sticky sessions a smell, and what's the alternative?</li>
+<li>Why must a POST that charges money have an idempotency key?</li>
+<li>Chat app: WebSockets or SSE — and why?</li>
+</ul>
+</div>
+
+<p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
+</div>
+</body>
+</html>

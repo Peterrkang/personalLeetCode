@@ -6,74 +6,7 @@
 <title>Flashcards</title>
 <link rel="stylesheet" href="style.css">
 <style>
-/* ---- Flashcards page-specific styles ---- */
-.fc-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0 8px; }
-.fc-toolbar .spacer { flex: 1 1 auto; }
-.fc-stat { color: var(--muted); font-size: 14px; }
-.fc-stat b { color: var(--accent-2); }
-
-/* Deck filter chips (reuses .toc look) */
-.fc-decks { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 18px; }
-.fc-decks button {
-  font: inherit; cursor: pointer;
-  padding: 5px 12px; font-size: 13px; line-height: 1.3;
-  color: var(--accent); background: var(--panel-2);
-  border: 1px solid var(--border); border-radius: 999px;
-  transition: background .15s, color .15s, border-color .15s;
-}
-.fc-decks button:hover { border-color: var(--accent); }
-.fc-decks button.active { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
-.fc-decks button .count { opacity: .7; font-size: 12px; }
-
-/* The card (3D flip) */
-.fc-stage { perspective: 1400px; margin: 10px 0 18px; }
-.fc-card {
-  position: relative; width: 100%; min-height: 280px;
-  cursor: pointer; transform-style: preserve-3d;
-  transition: transform .5s cubic-bezier(.4,.2,.2,1);
-}
-.fc-card.flipped { transform: rotateY(180deg); }
-.fc-face {
-  position: absolute; inset: 0; backface-visibility: hidden;
-  display: flex; flex-direction: column; justify-content: center;
-  padding: 32px 36px; border-radius: 14px;
-  border: 1px solid var(--border); background: var(--panel);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-}
-.fc-face .fc-kicker { position: absolute; top: 16px; left: 24px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.fc-face .fc-box { position: absolute; top: 16px; right: 24px; font-size: 12px; color: var(--muted); }
-.fc-face .fc-box b { color: var(--accent-2); }
-.fc-front { background: var(--panel); }
-.fc-back { transform: rotateY(180deg); background: var(--panel-2); }
-.fc-q { font-size: 22px; font-weight: 600; color: #fff; line-height: 1.5; }
-.fc-a { font-size: 16px; color: var(--text); line-height: 1.7; }
-.fc-a code, .fc-q code { background: rgba(0,0,0,0.3); }
-.fc-hint { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; color: var(--muted); font-size: 12px; }
-
-/* Controls */
-.fc-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 14px 0; }
-.fc-controls .spacer { flex: 1 1 auto; }
-.fc-btn {
-  font: inherit; cursor: pointer; font-size: 14px;
-  padding: 9px 16px; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
-  transition: background .15s, color .15s, border-color .15s, transform .05s;
-}
-.fc-btn:hover { border-color: var(--accent); }
-.fc-btn:active { transform: translateY(1px); }
-.fc-btn:disabled { opacity: .4; cursor: default; }
-.fc-btn.again { border-color: rgba(255,107,107,0.5); color: #ff8a8a; }
-.fc-btn.again:hover { background: rgba(255,107,107,0.12); }
-.fc-btn.good { border-color: rgba(126,231,135,0.5); color: var(--accent-2); }
-.fc-btn.good:hover { background: rgba(126,231,135,0.12); }
-.fc-counter { color: var(--muted); font-size: 14px; min-width: 70px; text-align: center; }
-
-.fc-empty { text-align: center; color: var(--muted); padding: 60px 20px; }
-.fc-empty b { color: var(--accent-2); }
-.kbd { display: inline-block; font-family: "SF Mono", Consolas, Monaco, monospace; font-size: 12px; background: var(--panel-2); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text); }
-.fc-legend { color: var(--muted); font-size: 13px; margin: 8px 0; }
-.fc-legend .kbd { margin: 0 2px; }
-
+/* Shared flashcard styles (fc-*, .kbd) live in style.css. */
 /* ---- "Which pattern?" decision guide (collapsible reference) ---- */
 .guide { margin: 22px 0; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); overflow: hidden; }
 .guide > summary {
@@ -124,7 +57,7 @@
 <div class="wrap">
 
 <h1>Flashcards</h1>
-<p class="subtitle">Spaced-repetition review for Block 4. Flip, rate yourself, repeat until mastered.</p>
+<p class="subtitle">Spaced-repetition review for Block 4 — algorithms decks plus the <a href="../system-design/index.html">system design course</a> (decks SD1–SD12, one per week). Flip, rate yourself, repeat until mastered.</p>
 
 <div class="progress-bar"><div class="progress-fill" id="fc-progress"></div></div>
 
@@ -246,5 +179,6 @@
 </details>
 
 <script src="flashcards.js"></script>
+<script src="flashcards-engine.js"></script>
 </body>
 </html>

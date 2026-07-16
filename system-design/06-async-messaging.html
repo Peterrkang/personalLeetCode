@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Async Processing &amp; Messaging</title>
+<link rel="stylesheet" href="../study-plan/style.css">
+</head>
+<body>
+<nav><div class="inner">
+  <a href="../study-plan/index.html">Overview</a>
+  <a href="../study-plan/system-design-curriculum.html">SD Curriculum</a>
+  <a href="index.html" class="active">SD Notes</a>
+  <a href="../study-plan/patterns.html">Patterns</a>
+  <a href="../study-plan/templates.html">Templates</a>
+  <a href="../study-plan/cheatsheet.html">JS Cheatsheet</a>
+  <a href="../study-plan/flashcards.html">Flashcards</a>
+  <a href="../study-plan/playground.html">Playground</a>
+</div></nav>
+<div class="wrap">
+
+<p class="subtitle"><a href="index.html">← All topics</a></p>
+<h1>Week 6 — Async Processing &amp; Messaging</h1>
+<p class="subtitle">Anything that doesn't have to happen before the user sees "OK" shouldn't. By end of week: put a queue in the right place, choose queue vs stream, and explain why exactly-once is really at-least-once + idempotency.</p>
+
+<h2>1. Why go async</h2>
+<ul>
+<li><strong>Decoupling:</strong> producer and consumer don't know each other, deploy independently, fail independently.</li>
+<li><strong>Buffering:</strong> the queue absorbs spikes — producers burst at 50k/sec, consumers drain steadily at 5k/sec, nobody falls over.</li>
+<li><strong>Latency:</strong> respond to the user after the essential write; do the slow parts (emails, thumbnails, fan-out, analytics) in the background.</li>
+<li>The price: <strong>eventual consistency</strong> (the work isn't done at response time), plus a new component to operate and monitor (queue depth!).</li>
+</ul>
+
+<h2>2. Message queues vs event streams</h2>
+<table>
+<tr><th></th><th>Queue (SQS, RabbitMQ)</th><th>Log / stream (Kafka, Kinesis)</th></tr>
+<tr><td>Model</td><td>Task list: consumer takes a message, acks it, it's <strong>gone</strong></td><td>Append-only log: consumers keep an <strong>offset</strong>; messages retained for days</td></tr>
+<tr><td>Consumers</td><td>Competing workers share one queue</td><td>Many independent consumer groups each read the <em>whole</em> stream</td></tr>
+<tr><td>Replay</td><td>No</td><td>Yes — rewind the offset</td></tr>
+<tr><td>Ordering</td><td>Usually best-effort</td><td>Strict <strong>within a partition</strong> (partition by key, e.g. user_id)</td></tr>
+<tr><td>Use for</td><td>Jobs: send email, resize image</td><td>Event firehose: activity events, CDC, feeding multiple systems</td></tr>
+</table>
+<ul>
+<li><strong>Pub/sub</strong> is the fan-out pattern: one event, many independent subscribers (order-placed → email service, inventory, analytics). Queues do it with topics/exchanges; Kafka does it natively via consumer groups.</li>
+</ul>
+
+<h2>3. Delivery guarantees</h2>
+<ul>
+<li><strong>At-most-once:</strong> fire and forget — can lose messages. Rarely acceptable.</li>
+<li><strong>At-least-once:</strong> the default. Consumer acks after processing; if it crashes mid-work, the message is redelivered → <strong>duplicates happen</strong>.</li>
+<li><strong>Exactly-once:</strong> effectively unachievable end-to-end across arbitrary systems. The real-world answer: <strong>at-least-once delivery + idempotent consumers</strong> = exactly-once <em>effect</em>.</li>
+<li><strong>Idempotent consumer:</strong> processing the same message twice is harmless. Techniques: dedupe table keyed by message ID (skip if seen), upserts instead of inserts, conditional updates ("set status=paid where status=pending").</li>
+</ul>
+
+<h2>4. Operating a pipeline (the senior signals)</h2>
+<ul>
+<li><strong>Backpressure:</strong> producers outpace consumers → queue grows without bound. Watch <strong>queue depth / consumer lag</strong>; respond by autoscaling consumers, rate-limiting producers, or shedding load.</li>
+<li><strong>Dead-letter queue (DLQ):</strong> after N failed attempts, park the message aside instead of retrying forever — one poison message must not block the pipeline. Alert on DLQ size, inspect, replay after the bug fix.</li>
+<li><strong>Retries with exponential backoff + jitter</strong> — immediate tight retries amplify outages.</li>
+<li><strong>Ordering:</strong> if user events must be processed in order, partition by <code>user_id</code> so one consumer sees that user's events sequentially. Global ordering doesn't scale; per-key ordering does.</li>
+<li><strong>Batch vs stream processing:</strong> batch = periodic jobs over bounded data (nightly reports); stream = continuous processing of unbounded data with seconds latency (live dashboards, fraud detection).</li>
+</ul>
+
+<div class="card">
+<h3>Worked example — async image-processing pipeline</h3>
+<ol>
+<li>Client uploads image → API stores original in <strong>object storage (S3)</strong>, writes a DB row <code>status=processing</code>, publishes <code>{image_id}</code> to the queue, returns <strong>202 Accepted</strong> immediately.</li>
+<li>Worker fleet consumes: download original → generate 3 sizes → upload to S3 → update row <code>status=ready</code> → publish <code>image.ready</code> for anyone who cares (notifications, feed).</li>
+<li><strong>Duplicates</strong> (at-least-once): resizing is naturally idempotent — same input, same output paths, upsert the row. Safe.</li>
+<li><strong>Poison message</strong> (corrupt image crashes the worker): 3 retries → DLQ → alert. Pipeline keeps flowing.</li>
+<li><strong>Black Friday spike:</strong> uploads 20× — queue depth grows, autoscaler adds workers, users see "processing…" a little longer. Nothing falls over. That's the whole point.</li>
+</ol>
+</div>
+
+<div class="callout">
+<strong>Exercise:</strong> Design "order placed" processing for e-commerce: payment capture, inventory decrement, confirmation email, analytics. Which steps must be synchronous? Which go through the queue? Where exactly do duplicates bite, and what makes each consumer idempotent?
+</div>
+
+<h2>Self-check</h2>
+<div class="card">
+<ul>
+<li>Three benefits of a queue between services — and the consistency price?</li>
+<li>Queue vs Kafka: who tracks what's been consumed in each?</li>
+<li>Why do duplicates exist under at-least-once, and what's the fix?</li>
+<li>What is a DLQ for, and what do you do with its contents?</li>
+<li>How do you get per-user ordering at scale?</li>
+<li>What metric tells you consumers are falling behind?</li>
+</ul>
+</div>
+
+<p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
+</div>
+</body>
+</html>

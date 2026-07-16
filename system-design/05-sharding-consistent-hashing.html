@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Sharding &amp; Consistent Hashing</title>
+<link rel="stylesheet" href="../study-plan/style.css">
+</head>
+<body>
+<nav><div class="inner">
+  <a href="../study-plan/index.html">Overview</a>
+  <a href="../study-plan/system-design-curriculum.html">SD Curriculum</a>
+  <a href="index.html" class="active">SD Notes</a>
+  <a href="../study-plan/patterns.html">Patterns</a>
+  <a href="../study-plan/templates.html">Templates</a>
+  <a href="../study-plan/cheatsheet.html">JS Cheatsheet</a>
+  <a href="../study-plan/flashcards.html">Flashcards</a>
+  <a href="../study-plan/playground.html">Playground</a>
+</div></nav>
+<div class="wrap">
+
+<p class="subtitle"><a href="index.html">← All topics</a></p>
+<h1>Week 5 — Partitioning, Sharding &amp; Consistent Hashing</h1>
+<p class="subtitle">What you do when the data no longer fits — or the writes no longer fit — on one machine. By end of week: pick a shard key and defend it, draw the consistent-hashing ring cold, and answer "what about the celebrity?"</p>
+
+<h2>1. Why and when to shard</h2>
+<ul>
+<li>Shard when a single node hits a wall: <strong>data size</strong> (10 TB table), <strong>write throughput</strong> (replicas only scale reads), or <strong>working set &gt; RAM</strong>.</li>
+<li>Sharding = <strong>horizontal partitioning</strong>: split rows across machines, each shard holds a subset. (Vertical partitioning = split columns/tables by feature — do that first, it's cheaper.)</li>
+<li>Costs you pay forever after: <strong>cross-shard queries and joins</strong> (scatter-gather), <strong>cross-shard transactions</strong> (2PC pain — avoid), <strong>rebalancing</strong>, and operational complexity. Shard as late as possible.</li>
+</ul>
+
+<h2>2. Partitioning strategies</h2>
+<table>
+<tr><th>Strategy</th><th>How</th><th>Good</th><th>Bad</th></tr>
+<tr><td><strong>Range</strong></td><td>Keys A–M → shard 1, N–Z → shard 2 (or by time)</td><td>Range scans stay on one shard</td><td>Hotspots: new/time-ordered keys all hit the last shard</td></tr>
+<tr><td><strong>Hash</strong></td><td><code>hash(key) % N</code> → shard</td><td>Even spread</td><td>Range queries hit every shard; naive mod breaks on resize (see §3)</td></tr>
+<tr><td><strong>Directory</strong></td><td>Lookup service maps key → shard</td><td>Total flexibility; migrate keys individually</td><td>The directory is an extra hop and a single point of failure</td></tr>
+</table>
+<ul>
+<li><strong>Choosing the shard key is the whole game.</strong> You want: (1) even data + traffic distribution, (2) the common query answerable on <strong>one</strong> shard.</li>
+<li>Example: shard user data by <code>user_id</code> → "load this user's stuff" is one shard. Shard tweets by <code>tweet_id</code> → even spread, but "this user's timeline" is scatter-gather. Every choice trades something; say the tradeoff.</li>
+</ul>
+
+<h2>3. Consistent hashing — know it cold</h2>
+<p>Problem: with <code>hash(key) % N</code>, changing N (adding/removing a node) remaps <strong>almost every key</strong> → a full-cluster data shuffle or total cache miss storm.</p>
+<ol>
+<li>Picture a <strong>ring</strong> of hash values 0 → 2³² wrapping around.</li>
+<li>Hash each <strong>node</strong> onto the ring. Hash each <strong>key</strong> onto the ring.</li>
+<li>A key belongs to the <strong>first node clockwise</strong> from it.</li>
+<li>Add a node → it takes over only the arc between it and its predecessor: <strong>~1/N of keys move</strong>, everything else stays put. Remove a node → its keys slide to the next node clockwise.</li>
+</ol>
+<ul>
+<li><strong>Virtual nodes:</strong> hash each physical node to ~100–200 points on the ring. Fixes lumpy distribution, lets a big machine own more vnodes, and spreads a dead node's load across <em>everyone</em> instead of dumping it on one neighbor.</li>
+<li>Used by Cassandra, DynamoDB, Memcached clients, most distributed caches/routers.</li>
+<li>Replication on the ring: store each key on its node <strong>plus the next R−1 nodes clockwise</strong>.</li>
+</ul>
+
+<h2>4. Hotspots &amp; the celebrity problem</h2>
+<ul>
+<li>Even a perfect hash spreads <em>keys</em>, not <em>load</em> — one viral user/post can melt its shard.</li>
+<li>Fixes, in escalating order:
+  <ol>
+  <li><strong>Cache the hot entity</strong> in front of the shard (often enough — hot data is by definition cacheable).</li>
+  <li><strong>Replicate the hot key</strong> to multiple nodes and load-balance reads across them.</li>
+  <li><strong>Split the key:</strong> append a random suffix (<code>celeb123#0..9</code>) so writes spread over 10 sub-keys; readers aggregate. (For write-hot keys, e.g. like-counters.)</li>
+  <li><strong>Isolate:</strong> give the whale its own dedicated shard (real systems literally special-case celebrities).</li>
+  </ol>
+</li>
+<li><strong>Rebalancing:</strong> plan for it up front. Trick: create many more logical partitions than nodes (e.g. 1024 partitions on 8 nodes) and move whole partitions when nodes join — no key-level rehashing ever.</li>
+</ul>
+
+<div class="card">
+<h3>Worked example — sharding a 10 TB users table</h3>
+<ul>
+<li>10 TB across shards targeting ≤ 1 TB each (headroom for growth + working set in RAM) → <strong>16 logical shards</strong>, mapped onto 8 physical nodes via consistent hashing with vnodes.</li>
+<li>Shard key: <code>user_id</code> (hash) — profile reads, settings, and auth all hit one shard.</li>
+<li>Query "find user by email" now can't route → keep a small <strong>global index table</strong> <code>email → user_id</code> (itself sharded by email hash).</li>
+<li>A user goes viral: their profile page reads 100k QPS → the profile is served from Redis (fix 1), and their follower <em>list</em> reads are replicated across 3 nodes (fix 2). Writes (new followers) go through a queue to absorb the spike.</li>
+</ul>
+</div>
+
+<div class="callout">
+<strong>Exercise:</strong> Draw the consistent-hashing ring from memory: 4 nodes, show which arcs each owns, then add node 5 and shade exactly which keys move. Then design the shard key for a multi-tenant SaaS (thousands of small tenants, three tenants are 100× bigger than the rest) — what goes wrong with plain <code>hash(tenant_id)</code>?
+</div>
+
+<h2>Self-check</h2>
+<div class="card">
+<ul>
+<li>What three walls force sharding, and which one can't replicas fix?</li>
+<li>Range vs hash partitioning — the core tradeoff in one sentence?</li>
+<li>Why does <code>% N</code> fail when N changes, and how does the ring fix it?</li>
+<li>What do virtual nodes buy you (two things)?</li>
+<li>Four escalating fixes for a hot key?</li>
+<li>What breaks when a query doesn't include the shard key, and what's the standard fix?</li>
+</ul>
+</div>
+
+<p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
+</div>
+</body>
+</html>

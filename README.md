@@ -102,4 +102,10 @@ It's stored only in your browser's `localStorage` and sent directly to `api.anth
 
 The playground is one page of a larger interview-prep site under
 [study-plan/](study-plan/) — open [study-plan/index.html](study-plan/index.html) for the
-overview, patterns, templates, cheatsheet, flashcards, and system-design notes.
+overview, patterns, templates, cheatsheet, and spaced-repetition
+[flashcards](study-plan/flashcards.html) covering both algorithms and system design.
+
+There's also a full 12-week **system design course** under
+[system-design/](system-design/) — open [system-design/index.html](system-design/index.html)
+for the syllabus and one topic page per week; each week has a matching
+flashcard deck (SD1–SD12).

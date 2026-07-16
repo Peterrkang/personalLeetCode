@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Caching, CDN &amp; Replication</title>
+<link rel="stylesheet" href="../study-plan/style.css">
+</head>
+<body>
+<nav><div class="inner">
+  <a href="../study-plan/index.html">Overview</a>
+  <a href="../study-plan/system-design-curriculum.html">SD Curriculum</a>
+  <a href="index.html" class="active">SD Notes</a>
+  <a href="../study-plan/patterns.html">Patterns</a>
+  <a href="../study-plan/templates.html">Templates</a>
+  <a href="../study-plan/cheatsheet.html">JS Cheatsheet</a>
+  <a href="../study-plan/flashcards.html">Flashcards</a>
+  <a href="../study-plan/playground.html">Playground</a>
+</div></nav>
+<div class="wrap">
+
+<p class="subtitle"><a href="index.html">← All topics</a></p>
+<h1>Week 4 — Caching, CDN &amp; Replication</h1>
+<p class="subtitle">The cheapest 10–100× win in any read-heavy system. By end of week: place caches at every layer of a design, pick a write strategy, and explain leader-follower replication with its one big gotcha.</p>
+
+<h2>1. Where caches live</h2>
+<p>Client (browser) → CDN → reverse proxy → <strong>application cache (Redis/Memcached)</strong> → DB's own buffer pool. In interviews, "add a cache" usually means the application layer: a Redis lookup at ~0.5 ms vs a DB query at ~10–50 ms.</p>
+<ul>
+<li>Caching works because of <strong>skew</strong>: the 80/20 rule — a small fraction of hot keys serves most reads. Measure with <strong>hit ratio</strong>; a cache below ~80% hits usually needs rethinking (keys too unique, TTL too short).</li>
+</ul>
+
+<h2>2. Read &amp; write strategies</h2>
+<table>
+<tr><th>Strategy</th><th>How it works</th><th>Tradeoff</th></tr>
+<tr><td><strong>Cache-aside</strong> (lazy)</td><td>App reads cache; on miss, reads DB and fills cache</td><td>The default. Only hot data cached; first read is slow; app owns the logic</td></tr>
+<tr><td><strong>Read-through</strong></td><td>Cache itself loads from DB on miss</td><td>Simpler app code; cache library must know the DB</td></tr>
+<tr><td><strong>Write-through</strong></td><td>Write cache + DB synchronously</td><td>Cache always fresh; writes pay double latency</td></tr>
+<tr><td><strong>Write-back</strong></td><td>Write cache only; flush to DB async</td><td>Fastest writes, absorbs bursts; <strong>can lose data</strong> if cache dies before flush</td></tr>
+<tr><td><strong>Write-around</strong></td><td>Write DB only; cache fills on read</td><td>Keeps write-once data from polluting the cache</td></tr>
+</table>
+
+<h2>3. Eviction &amp; invalidation</h2>
+<ul>
+<li><strong>Eviction</strong> (cache is full): <strong>LRU</strong> is the default — drop the least-recently-used key. LFU (least frequently used) resists one-off scans; FIFO is rarely right.</li>
+<li><strong>Invalidation</strong> (data changed): the famously hard problem. Options: <strong>TTL</strong> (simple; bounded staleness), <strong>delete-on-write</strong> (app deletes the key when it updates the DB — preferred over updating the cache, which races), or event-driven purge.</li>
+<li>Classic failure modes worth naming in interviews:
+  <ul>
+  <li><strong>Thundering herd / cache stampede:</strong> a hot key expires and 10k requests hit the DB at once. Fix: per-key lock ("only one request recomputes"), or staggered/soft TTLs.</li>
+  <li><strong>Cache penetration:</strong> requests for keys that don't exist always miss to the DB. Fix: cache the negative result, or a Bloom filter in front.</li>
+  <li><strong>Hot key:</strong> one celebrity key overloads a single cache node. Fix: replicate the key across nodes or add a local in-process cache.</li>
+  </ul>
+</li>
+</ul>
+
+<h2>4. CDN</h2>
+<ul>
+<li>A CDN is a globally distributed cache for content, terminating requests near the user — turns a 150 ms cross-ocean round trip into ~10 ms to an edge PoP.</li>
+<li><strong>Pull CDN</strong> (default): edge fetches from your origin on first miss, then caches per <code>Cache-Control</code>. Easy; first request per region is slow.</li>
+<li><strong>Push CDN:</strong> you upload content to the CDN ahead of time. For large, predictable assets (video releases).</li>
+<li>Serve <strong>static assets</strong> (images, JS, video segments) from CDN always; cache-bust with hashed filenames (<code>app.3f2a1.js</code> + immutable TTL). Dynamic API responses can also be edge-cached briefly (e.g. 5 s) to absorb read storms.</li>
+</ul>
+
+<h2>5. Redundancy &amp; replication</h2>
+<ul>
+<li><strong>Redundancy</strong> = extra copies of components (no single point of failure). <strong>Replication</strong> = keeping the copies of <em>data</em> in sync.</li>
+<li><strong>Leader-follower (primary-replica):</strong> writes go to the leader; followers replicate the log and serve reads. Read scaling for free; on leader death, promote a follower (<strong>failover</strong>).</li>
+<li>Replication is usually <strong>asynchronous</strong> → <strong>replication lag</strong>. The classic bug: user writes a comment (leader), refreshes, reads from a lagging replica — comment "disappears." Fix: <strong>read-your-own-writes</strong> — pin a user's reads to the leader briefly after they write.</li>
+<li><strong>Multi-leader:</strong> writes accepted in several regions — lower write latency worldwide, but concurrent writes to the same row <strong>conflict</strong> and need resolution (last-write-wins, CRDTs). Avoid unless you need it.</li>
+<li>Followers double as <strong>failover targets and backups</strong> — replication is both a scaling and an availability tool.</li>
+</ul>
+
+<div class="card">
+<h3>Worked example — bolting caching onto the e-commerce design</h3>
+<ul>
+<li>Product pages: <strong>cache-aside Redis</strong>, key <code>product:{id}</code>, TTL 5 min + <strong>delete-on-write</strong> when a merchant edits. Read QPS on the DB drops ~95%.</li>
+<li>Product images: <strong>CDN</strong> with hashed URLs, 1-year TTL.</li>
+<li>Stock counts: <strong>don't cache</strong> (or cache seconds only) — overselling is worse than a slow read. Correctness beats speed here.</li>
+<li>DB: 1 leader + 2 read replicas; browsing reads hit replicas, checkout reads/writes hit the leader.</li>
+</ul>
+</div>
+
+<div class="callout">
+<strong>Exercise:</strong> Your product cache shows stale prices for up to 5 minutes after a merchant update. Walk through three invalidation designs (shorter TTL, delete-on-write, event-driven purge) and their failure modes. Then: what happens when the "daily deals" key expires at noon under 50k QPS, and how do you prevent it?
+</div>
+
+<h2>Self-check</h2>
+<div class="card">
+<ul>
+<li>Can I sketch cache-aside, including who fills the cache and when?</li>
+<li>Write-through vs write-back — which risks data loss and why?</li>
+<li>Why is delete-on-write safer than update-on-write?</li>
+<li>What is a cache stampede and two ways to stop one?</li>
+<li>Pull vs push CDN — when each?</li>
+<li>What is replication lag, and how does read-your-own-writes fix the UX?</li>
+</ul>
+</div>
+
+<p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
+</div>
+</body>
+</html>

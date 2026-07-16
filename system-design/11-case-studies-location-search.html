@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design — Case Studies: Uber &amp; Typeahead</title>
+<link rel="stylesheet" href="../study-plan/style.css">
+</head>
+<body>
+<nav><div class="inner">
+  <a href="../study-plan/index.html">Overview</a>
+  <a href="../study-plan/system-design-curriculum.html">SD Curriculum</a>
+  <a href="index.html" class="active">SD Notes</a>
+  <a href="../study-plan/patterns.html">Patterns</a>
+  <a href="../study-plan/templates.html">Templates</a>
+  <a href="../study-plan/cheatsheet.html">JS Cheatsheet</a>
+  <a href="../study-plan/flashcards.html">Flashcards</a>
+  <a href="../study-plan/playground.html">Playground</a>
+</div></nav>
+<div class="wrap">
+
+<p class="subtitle"><a href="index.html">← All topics</a></p>
+<h1>Week 11 — Case Studies: Uber &amp; Typeahead</h1>
+<p class="subtitle">Two specialized-index designs: geospatial ("what's near me?") and prefix search ("what starts with…?"). The insight in both is the same — a plain B-tree can't answer the question, so you build the index shape that can.</p>
+
+<h2>Case 1 — Uber / Lyft / Yelp (proximity)</h2>
+
+<h3>Why not just a database?</h3>
+<p><code>WHERE lat BETWEEN … AND lng BETWEEN …</code> can't use one B-tree efficiently — each index narrows one dimension. You need a <strong>spatial index</strong> that maps 2D → something indexable.</p>
+<table>
+<tr><th>Index</th><th>Idea</th><th>Notes</th></tr>
+<tr><td><strong>Geohash</strong></td><td>Interleave lat/lng bits → base32 string; longer = smaller cell. Nearby points <em>usually</em> share prefixes</td><td>String prefix search = cheap (works in Redis). Gotcha: neighbors across cell borders don't share a prefix → always query the cell <strong>+ 8 neighbors</strong></td></tr>
+<tr><td><strong>Quadtree</strong></td><td>Recursively split the map into 4 quadrants until each leaf holds ≤ K points</td><td>Adapts to density: Manhattan = tiny cells, Nevada = huge. Yelp-style favorite</td></tr>
+<tr><td><strong>S2 / H3</strong></td><td>Production cell libraries (Google/Uber)</td><td>Name-drop; don't derive</td></tr>
+</table>
+
+<h3>Design</h3>
+<ul>
+<li><strong>Drivers ping location every ~4 s</strong> → millions of writes/sec that are instantly stale → keep the live index <strong>in memory</strong> (Redis: geohash cell → set of driver IDs), not in a durable DB. Persist only trip events. It's fine to lose the live index — it rebuilds in seconds from pings.</li>
+<li><strong>Matching:</strong> rider requests → compute rider's cell → fetch drivers in cell + neighbors → rank by ETA (road distance, not straight-line) → offer to driver(s); lock the driver during the offer (no double-dispatch).</li>
+<li><strong>Scale by geography:</strong> shard the index by region/city — queries are inherently local. A hot city (concert lets out) stays contained.</li>
+<li><strong>Surge / supply-demand:</strong> per-cell counters of open requests vs available drivers — another thing cells give you for free.</li>
+<li>Yelp variant: places don't move → <strong>static quadtree</strong>, heavily cached, rebuilt on business updates; add ratings/filters at rank time.</li>
+</ul>
+
+<h2>Case 2 — Typeahead / autocomplete</h2>
+
+<h3>Requirements</h3>
+<ul>
+<li>Suggestions within <strong>~100 ms per keystroke</strong>; top 5–10 by popularity; freshness can lag (yesterday's trends are fine; call this out).</li>
+<li>Scale: every keystroke of every search user hits this — read QPS is enormous; it must be <strong>cheap per query</strong>.</li>
+</ul>
+
+<h3>Design — trie + precomputed top-K</h3>
+<ul>
+<li>A <strong>trie</strong> over popular queries. The trick: <strong>store the top-K completions at every node</strong>, precomputed — a lookup is walk-the-prefix + return the stored list. O(prefix length), zero ranking work at query time.</li>
+<li><strong>Don't update the trie online.</strong> Log queries → aggregate counts offline (batch/stream job) → rebuild the trie periodically (hourly/daily) → hot-swap. Serving stays read-only and lock-free.</li>
+<li><strong>Sharding the trie:</strong> by prefix range (a–i / j–r / s–z, tuned by traffic so 's' doesn't melt one shard). Each shard replicated for read throughput.</li>
+<li><strong>Cache the first 1–3 characters</strong> (there are only ~26–26³ of them — they cover a huge share of traffic; even a CDN can serve these).</li>
+<li>Client hygiene: debounce keystrokes, cancel in-flight requests, cache results locally.</li>
+<li>Extras when asked: per-user personalization (blend a small user-history trie), trending injection (fast lane for sudden spikes), filtering (never suggest blocked terms).</li>
+</ul>
+
+<div class="callout tip">
+<strong>Shared lesson:</strong> both designs <em>precompute the answer shape</em>. Uber buckets the world into cells so "near me" is a set lookup; typeahead stores top-K at every node so ranking already happened. When latency budgets are tight, move work from read time to write/build time.
+</div>
+
+<div class="callout">
+<strong>Exercise (45 min):</strong> Design typeahead end-to-end: trie with top-K at nodes, offline rebuild pipeline, prefix sharding, first-char caching. Deep-dive: a breaking-news term needs to surface within minutes — what's your fast path around the daily rebuild? Then sketch Uber's driver index and explain why it lives in RAM.
+</div>
+
+<h2>Self-check</h2>
+<div class="card">
+<ul>
+<li>Why can't a composite B-tree index answer "nearest 10 drivers"?</li>
+<li>Geohash vs quadtree — one strength of each, and the geohash border gotcha?</li>
+<li>Why is it acceptable — desirable, even — that Uber's live index is volatile?</li>
+<li>What exactly is stored at each trie node, and why does that make queries O(L)?</li>
+<li>Why rebuild the trie offline instead of updating counts per query?</li>
+<li>How do both systems trade write/build-time work for read-time speed?</li>
+</ul>
+</div>
+
+<p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
+</div>
+</body>
+</html>

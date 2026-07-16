@@ -21,29 +21,37 @@
 
 <p class="subtitle"><a href="index.html">← All topics</a></p>
 <h1>Week 2 — Networking, Load Balancing &amp; APIs</h1>
-<p class="subtitle">How a request actually travels, how you spread traffic across machines, and how services talk to each other. By end of week: sketch the full path browser → DNS → LB → server, pick L4 vs L7 with a reason, and design a clean REST API.</p>
+<p class="subtitle">How a request actually travels, how you spread traffic across machines, and how services talk to each other. By end of week: sketch the full path browser → DNS → LB → gateway → server, pick L4 vs L7 with a reason, and design a clean, secured REST API.</p>
 
 <h2>1. Life of a request</h2>
 <ol>
-<li><strong>DNS lookup:</strong> browser resolves <code>example.com</code> → IP. Cached at browser, OS, resolver, and authoritative levels (TTL controls staleness). DNS itself is a giant distributed, eventually-consistent database.</li>
-<li><strong>TCP handshake</strong> (SYN / SYN-ACK / ACK), then <strong>TLS handshake</strong> for HTTPS — each is round trips, which is why connection reuse (keep-alive) matters.</li>
+<li><strong>DNS lookup:</strong> browser resolves <code>example.com</code> → IP. Cached at browser, OS, resolver, and authoritative levels (deep dive in §2).</li>
+<li><strong>TCP handshake</strong> (SYN / SYN-ACK / ACK), then <strong>TLS handshake</strong> for HTTPS — TLS 1.3 (today's standard) costs one round trip, and <strong>0-RTT resumption</strong> makes repeat connections nearly free; still, connection reuse (keep-alive) matters.</li>
 <li><strong>HTTP request</strong> hits an edge (CDN / reverse proxy / load balancer), which routes to an app server.</li>
 <li>Response flows back; the browser renders.</li>
 </ol>
 <ul>
 <li><strong>HTTP/1.1:</strong> one request at a time per connection (head-of-line blocking) → browsers open ~6 connections.</li>
 <li><strong>HTTP/2:</strong> multiplexes many streams over one TCP connection; header compression.</li>
-<li><strong>HTTP/3 (QUIC):</strong> runs on UDP; removes TCP head-of-line blocking; faster handshakes.</li>
+<li><strong>HTTP/3 (QUIC):</strong> runs on UDP; removes TCP head-of-line blocking; combines transport + TLS handshake. No longer exotic — roughly a third of web traffic, on by default at major CDNs and browsers.</li>
 </ul>
 
-<h2>2. Proxies</h2>
+<h2>2. DNS — the internet's phone book</h2>
+<ul>
+<li><strong>Resolution path (on a full miss):</strong> browser cache → OS cache → <strong>recursive resolver</strong> (your ISP's, or 8.8.8.8) → root server → TLD server (<code>.com</code>) → <strong>authoritative</strong> server for the domain. Every level caches per the record's <strong>TTL</strong> — DNS is a giant distributed, eventually-consistent database.</li>
+<li><strong>Records to know:</strong> <code>A</code>/<code>AAAA</code> (name → IPv4/IPv6), <code>CNAME</code> (alias to another name), <code>NS</code> (who's authoritative), <code>TXT</code> (domain verification, SPF).</li>
+<li><strong>TTL tradeoff:</strong> long TTL = fewer lookups but slow to change; drop it to ~60 s <em>before</em> a planned migration. Clients don't always honor TTLs, so DNS failover takes minutes, not seconds — which is why real failover lives at the LB layer, not in DNS.</li>
+<li><strong>DNS as a load balancer:</strong> multiple A records (round-robin), weighted answers, or <strong>GeoDNS</strong> — answer with the nearest region's IP. Coarse, but it's the only balancing that acts <em>before</em> traffic reaches you; every multi-region design starts here.</li>
+</ul>
+
+<h2>3. Proxies</h2>
 <ul>
 <li><strong>Forward proxy:</strong> sits in front of <em>clients</em> — hides the client from the server (corporate egress, filtering, anonymity).</li>
 <li><strong>Reverse proxy:</strong> sits in front of <em>servers</em> — hides the fleet from clients. Does TLS termination, compression, caching, rate limiting, routing (nginx, Envoy, HAProxy).</li>
 <li>A load balancer is a reverse proxy whose main job is <strong>distribution</strong>; most real deployments combine the roles.</li>
 </ul>
 
-<h2>3. Load balancing</h2>
+<h2>4. Load balancing</h2>
 <table>
 <tr><th></th><th>L4 (transport)</th><th>L7 (application)</th></tr>
 <tr><td>Sees</td><td>IP + port only</td><td>Full HTTP: path, headers, cookies</td></tr>
@@ -58,7 +66,15 @@
 <li><strong>Sticky sessions</strong> pin a user to one server — avoid if you can; keep servers stateless and put session state in Redis instead.</li>
 </ul>
 
-<h2>4. REST API design</h2>
+<h2>5. API gateway</h2>
+<ul>
+<li>The <strong>single front door</strong> for a microservice backend: clients hit one endpoint; the gateway <strong>routes</strong> <code>/users/*</code> → user service, <code>/videos/*</code> → video service.</li>
+<li>Central place for <strong>cross-cutting concerns</strong>: authentication (validate the token once, not in 30 services), rate limiting, TLS termination, request logging, response caching, protocol translation (HTTP outside → gRPC inside).</li>
+<li><strong>Gateway vs load balancer:</strong> an LB spreads identical traffic across <em>copies of one service</em>; a gateway routes and applies policy across <em>many different services</em>. In practice they stack: edge LB → API gateway → per-service LBs. (Kong, AWS API Gateway, Envoy.)</li>
+<li>Keep it <strong>thin</strong> — routing and policy only. Business logic in a gateway becomes a chokepoint everyone fears deploying. The gateway is stateless, so scale it horizontally like any web tier.</li>
+</ul>
+
+<h2>6. REST API design</h2>
 <ul>
 <li>Resources are <strong>nouns</strong>, methods are <strong>verbs</strong>: <code>GET /users/123/orders</code>, not <code>GET /getUserOrders?id=123</code>.</li>
 <li><strong>Idempotency:</strong> GET, PUT, DELETE are idempotent (safe to retry); POST is not — for payments/orders, accept an <strong>idempotency key</strong> header so retries don't double-charge.</li>
@@ -67,7 +83,7 @@
 <li><strong>Status codes:</strong> 200 OK, 201 Created, 400 bad input, 401 unauthenticated, 403 unauthorized, 404 not found, 409 conflict, 429 rate-limited, 500 server bug, 503 overloaded.</li>
 </ul>
 
-<h2>5. REST vs gRPC vs GraphQL</h2>
+<h2>7. REST vs gRPC vs GraphQL</h2>
 <table>
 <tr><th></th><th>REST</th><th>gRPC</th><th>GraphQL</th></tr>
 <tr><td>Format</td><td>JSON over HTTP</td><td>Protobuf (binary) over HTTP/2</td><td>Query language over HTTP</td></tr>
@@ -76,7 +92,7 @@
 <tr><td>Use for</td><td>Public APIs</td><td>Internal service-to-service</td><td>Diverse frontend clients (mobile + web)</td></tr>
 </table>
 
-<h2>6. Server push: polling vs long-polling vs WebSockets vs SSE</h2>
+<h2>8. Server push: polling vs long-polling vs WebSockets vs SSE</h2>
 <p>How does the server tell the client something happened? (Shows up in chat, notifications, live dashboards.)</p>
 <table>
 <tr><th>Technique</th><th>How</th><th>Tradeoff</th></tr>
@@ -89,8 +105,19 @@
 <strong>Interview default:</strong> chat / collaborative editing → WebSockets. Notifications / live scores → SSE or long polling. "Check occasionally" → polling. Say the tradeoff out loud: persistent connections cost memory per client and make servers stateful.
 </div>
 
+<h2>9. Security essentials</h2>
+<ul>
+<li><strong>Authentication</strong> = who are you (fail → 401); <strong>authorization</strong> = what may you do (fail → 403). Say both words in every API design.</li>
+<li><strong>Sessions vs JWTs:</strong> session = random ID in a cookie, state in Redis — easy to revoke, but every request hits the session store. <strong>JWT</strong> = signed, self-contained token — stateless, any server verifies it locally, but <strong>revocation is hard</strong>: keep expiry short (~15 min) and pair with a refresh token.</li>
+<li><strong>OAuth 2.0 / OIDC:</strong> delegated auth — "Sign in with Google" without ever seeing the password. Know the shape: redirect to provider → user consents → app receives an authorization code → exchanges it for tokens.</li>
+<li><strong>API keys</strong> identify <em>applications</em> (service-to-service calls, public-API quotas); user auth identifies <em>people</em>.</li>
+<li><strong>Encrypt everywhere:</strong> TLS in transit, encryption at rest, and passwords <strong>hashed with bcrypt/argon2</strong> — never encrypted, never plain.</li>
+<li><strong>Passkeys (WebAuthn)</strong> are the modern login default — phishing-resistant public-key credentials synced by the platform (Google/Apple accounts are passkey-first now). Mentioning "passkeys with password fallback" beats "passwords + SMS 2FA" in a 2026 interview.</li>
+<li><strong>Edge defenses:</strong> WAF for injection/bot patterns, per-user/IP rate limiting (week 7 builds one), DDoS absorption at the CDN. In interviews one sentence usually covers it: "auth at the gateway via JWT, TLS everywhere, rate limiting at the edge."</li>
+</ul>
+
 <div class="callout">
-<strong>Exercise:</strong> Design the REST API for a pastebin: create paste (with optional expiry + custom alias), fetch paste, delete paste. Specify endpoints, methods, status codes, and how you'd paginate a user's paste list. Then decide: where does a load balancer go, L4 or L7, and which algorithm?
+<strong>Exercise:</strong> Design the REST API for a pastebin: create paste (with optional expiry + custom alias), fetch paste, delete paste. Specify endpoints, methods, status codes, and how you'd paginate a user's paste list. Then decide: where does a load balancer go, L4 or L7, which algorithm — and where do requests get authenticated?
 </div>
 
 <h2>Self-check</h2>
@@ -102,10 +129,14 @@
 <li>Why are sticky sessions a smell, and what's the alternative?</li>
 <li>Why must a POST that charges money have an idempotency key?</li>
 <li>Chat app: WebSockets or SSE — and why?</li>
+<li>Why drop the DNS TTL before a migration — and why is DNS still the wrong place for failover?</li>
+<li>API gateway vs load balancer — what does each spread traffic across?</li>
+<li>Sessions vs JWTs — which is easier to revoke, and what's the mitigation for the other?</li>
 </ul>
 </div>
 
 <p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
 </div>
+<script src="ask-claude.js" defer></script>
 </body>
 </html>

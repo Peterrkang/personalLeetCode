@@ -51,18 +51,26 @@
 <li><strong>The problem:</strong> machines that crash and a network that drops messages must still <em>agree</em> on one value (who's leader, what's committed).</li>
 <li><strong>Raft</strong> (know its shape): nodes are follower / candidate / <strong>leader</strong>; leader elected by <strong>majority vote</strong> with randomized election timeouts; all writes flow through the leader, committed once a majority replicates them. Majority = any two quorums intersect → no <strong>split-brain</strong> (two leaders during a partition — the minority side can't commit).</li>
 <li>Failure detection is <strong>heartbeats</strong>: leader pings followers; silence past a timeout → new election. (Same primitive as LB health checks and chat presence — it's heartbeats all the way down.)</li>
-<li>You don't implement consensus; you rent it: <strong>ZooKeeper / etcd</strong> for leader election, distributed locks, service discovery, config. Use it for <em>coordination metadata</em>, never for data-path traffic.</li>
+<li>You don't implement consensus; you rent it: <strong>ZooKeeper / etcd</strong> for leader election, distributed locks, service discovery, config. Use it for <em>coordination metadata</em>, never for data-path traffic. (The 2026 trend is embedding Raft instead of running a separate coordinator — Kafka dropped ZooKeeper entirely for built-in <strong>KRaft</strong> as of Kafka 4.0; CockroachDB and etcd itself are Raft-native.)</li>
 </ul>
 
-<h2>5. Small tools worth name-dropping</h2>
+<h2>5. Heartbeats &amp; checksums — detecting failure and corruption</h2>
 <ul>
-<li><strong>Bloom filter:</strong> probabilistic set — "definitely not present" or "probably present" in tiny memory. Skips useless disk lookups (LSM stores like Cassandra), pre-filters cache penetration, "username taken?" pre-check.</li>
-<li><strong>Checksums:</strong> hash data at rest / in transit; verify on read to catch silent corruption (S3 and HDFS do this on every block).</li>
+<li><strong>Heartbeat:</strong> a periodic "I'm alive" signal — the <em>only</em> way a distributed system learns a node died. Push (node reports to a monitor) or pull (monitor probes an endpoint); miss ~3 consecutive intervals → declare the node dead and act (re-route, re-replicate, re-elect).</li>
+<li><strong>The tuning tradeoff:</strong> short interval/timeout = fast detection but <strong>false positives</strong> — a GC pause or network blip gets a healthy node declared dead and its data pointlessly re-replicated. Long = slow failover. A timeout can never distinguish <em>dead</em> from <em>slow</em>; that ambiguity is where split-brain comes from, and why section 4's majority vote exists.</li>
+<li>Same primitive everywhere: LB health checks (week 2), Raft leader liveness (above), GFS/HDFS chunkserver liveness (week 10), chat presence (week 9).</li>
+<li><strong>Checksum:</strong> a hash stored alongside each block of data and verified on every read. Disks silently rot, RAM flips bits, and TCP's 16-bit checksum misses errors at scale — so verify end-to-end: compute where data is written, check where it's read. Mismatch → discard that replica, read another copy, re-replicate.</li>
+<li>S3 and HDFS checksum every block and also run background <strong>scrubbing</strong> — re-verifying cold data so all three replicas don't rot unnoticed.</li>
+</ul>
+
+<h2>6. Small tools worth name-dropping</h2>
+<ul>
+<li><strong>Bloom filter:</strong> probabilistic set — "definitely not present" or "probably present" in tiny memory. Skips useless disk lookups (LSM stores like Cassandra), pre-filters cache penetration, "username taken?" pre-check. (Full treatment in week 4.)</li>
 <li><strong>Gossip protocol:</strong> nodes exchange state with random peers; cluster membership/failure info spreads in O(log n) rounds without a coordinator (Cassandra, Dynamo).</li>
 <li><strong>Distributed tracing:</strong> a request ID propagated through every hop (OpenTelemetry) — how you debug a 30-service latency mystery.</li>
 </ul>
 
-<h2>6. Resilience patterns (say these unprompted)</h2>
+<h2>7. Resilience patterns (say these unprompted)</h2>
 <ul>
 <li><strong>Timeouts everywhere</strong> — an un-timed-out call is a thread leak waiting for an outage.</li>
 <li><strong>Retries with exponential backoff + jitter</strong> — and only on idempotent operations; retry storms without jitter <em>synchronize</em> and DDoS your own recovery.</li>
@@ -87,6 +95,8 @@
 <li>What does PACELC add that CAP misses?</li>
 <li>Why does R + W &gt; N guarantee fresh reads?</li>
 <li>How does majority voting prevent split-brain?</li>
+<li>Why does an aggressive heartbeat timeout cause more failures than it catches?</li>
+<li>TCP already has checksums — why do S3 and HDFS still checksum every block?</li>
 <li>What can a Bloom filter never tell you?</li>
 <li>Circuit breaker vs retry — when does each make an outage worse?</li>
 </ul>
@@ -94,5 +104,6 @@
 
 <p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
 </div>
+<script src="ask-claude.js" defer></script>
 </body>
 </html>

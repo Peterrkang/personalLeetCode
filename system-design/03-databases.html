@@ -33,6 +33,9 @@
 <tr><td>Pick when</td><td>Relational data, complex queries, correctness first (orders, payments, inventory)</td><td>Massive scale, high write throughput, simple access patterns (feeds, sessions, events)</td></tr>
 </table>
 <p>NoSQL families: <strong>key-value</strong> (Redis, DynamoDB), <strong>document</strong> (MongoDB), <strong>wide-column</strong> (Cassandra — huge write throughput, queries by partition key), <strong>graph</strong> (Neo4j — relationship traversal).</p>
+<ul>
+<li><strong>Distributed SQL</strong> (Spanner, CockroachDB, TiDB, Vitess/PlanetScale) blurs the old table: full SQL + ACID with horizontal sharding built in. The catch: consensus on the commit path adds write latency, and cross-shard transactions still cost more. Modern senior answer to "relational but outgrows one machine" — name it instead of accepting "sharding SQL is painful" as a law of nature.</li>
+</ul>
 <div class="callout tip">
 <strong>Interview default:</strong> start relational. Move a table to NoSQL when you can name the reason: write volume, size beyond one machine, or schema flexibility. "We'll use MongoDB because it's web scale" is an anti-signal; "user table stays in Postgres, activity events go to Cassandra because it's 50k writes/sec append-only" is the senior version.
 </div>
@@ -95,5 +98,6 @@
 
 <p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
 </div>
+<script src="ask-claude.js" defer></script>
 </body>
 </html>

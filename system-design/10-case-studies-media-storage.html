@@ -66,8 +66,17 @@
 <li><strong>Conflicts:</strong> two offline edits to the same file → don't merge, don't drop: keep both (<code>report (Bob's conflicted copy)</code>). Versioning = keeping old chunk lists — chunks are immutable, so history is nearly free.</li>
 </ul>
 
+<h2>Under the hood — distributed file systems (GFS / HDFS)</h2>
+<p>Dropbox's block service, S3, and Hadoop all descend from one design: Google File System (2003), cloned in open source as HDFS. Know its shape — it's the canonical answer to "how do you store petabytes on commodity machines?"</p>
+<ul>
+<li><strong>One master (HDFS: NameNode)</strong> keeps all metadata in memory — file → chunk list, chunk → which servers. <strong>Chunkservers (DataNodes)</strong> hold the actual bytes in <strong>large blocks (64–128 MB)</strong> — big on purpose, so a petabyte is few enough blocks for one master to track. Each block is <strong>replicated ×3 across racks</strong>.</li>
+<li><strong>Data bypasses the master:</strong> the client asks it for block locations (a tiny message), then streams directly from chunkservers. The master never touches file bytes — that's how one machine coordinates petabytes without being a bottleneck.</li>
+<li><strong>Failure handling:</strong> chunkservers send <strong>heartbeats</strong>; go silent long enough and the master re-replicates every block that server held from the surviving copies. Each block carries a <strong>checksum</strong> verified on read — a corrupt replica is discarded and re-copied from a good one.</li>
+<li>Notice this is exactly the Dropbox split above — a small consistent brain over dumb wide storage — with week 12's heartbeats and checksums doing the real work.</li>
+</ul>
+
 <div class="callout tip">
-<strong>Pattern to reuse everywhere:</strong> separate the <strong>data plane</strong> (huge, dumb, immutable, cache-friendly — chunks/segments on object storage + CDN) from the <strong>control plane</strong> (small, smart, consistent — metadata in a proper DB). YouTube, Dropbox, S3, and Instagram all decompose this way.
+<strong>Pattern to reuse everywhere:</strong> separate the <strong>data plane</strong> (huge, dumb, immutable, cache-friendly — chunks/segments on object storage + CDN) from the <strong>control plane</strong> (small, smart, consistent — metadata in a proper DB). YouTube, Dropbox, S3, GFS/HDFS, and Instagram all decompose this way.
 </div>
 
 <div class="callout">
@@ -83,10 +92,12 @@
 <li>What three features fall out of content-hash chunking almost for free?</li>
 <li>Which part of Dropbox needs strong consistency, and which is happily eventual?</li>
 <li>How do immutable chunks make file versioning cheap?</li>
+<li>In GFS/HDFS, why do clients never stream file data through the master — and why are blocks so large?</li>
 </ul>
 </div>
 
 <p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
 </div>
+<script src="ask-claude.js" defer></script>
 </body>
 </html>

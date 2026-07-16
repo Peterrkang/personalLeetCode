@@ -30,9 +30,9 @@ Pairs with the week-by-week <a href="../study-plan/system-design-curriculum.html
 <table>
 <tr><th>#</th><th>Topic</th><th>Covers</th><th>Plan week</th></tr>
 <tr><td>1</td><td><a href="01-fundamentals.html">Fundamentals</a></td><td>Latency vs throughput, the nines, scaling, back-of-envelope math, the 6-step framework</td><td>Week 1</td></tr>
-<tr><td>2</td><td><a href="02-networking-apis.html">Networking, Load Balancing &amp; APIs</a></td><td>DNS→server request path, proxies, L4/L7 LBs, REST vs gRPC vs GraphQL, WebSockets vs SSE vs polling</td><td>Week 2</td></tr>
+<tr><td>2</td><td><a href="02-networking-apis.html">Networking, Load Balancing &amp; APIs</a></td><td>DNS records &amp; GeoDNS, proxies, L4/L7 LBs, API gateways, REST vs gRPC vs GraphQL, WebSockets vs SSE, auth &amp; security</td><td>Week 2</td></tr>
 <tr><td>3</td><td><a href="03-databases.html">Databases</a></td><td>SQL vs NoSQL, indexes, ACID vs BASE, normalization vs denormalization, distributed IDs</td><td>Week 3</td></tr>
-<tr><td>4</td><td><a href="04-caching-cdn.html">Caching, CDN &amp; Replication</a></td><td>Cache-aside &amp; write strategies, eviction/invalidation, stampedes, CDNs, leader-follower replication</td><td>Week 4</td></tr>
+<tr><td>4</td><td><a href="04-caching-cdn.html">Caching, CDN &amp; Replication</a></td><td>Cache-aside &amp; write strategies, eviction/invalidation, stampedes, Bloom filters, CDNs, leader-follower replication</td><td>Week 4</td></tr>
 <tr><td>5</td><td><a href="05-sharding-consistent-hashing.html">Sharding &amp; Consistent Hashing</a></td><td>Partitioning strategies, shard keys, the ring + virtual nodes, hotspots &amp; the celebrity problem</td><td>Week 5</td></tr>
 <tr><td>6</td><td><a href="06-async-messaging.html">Async Processing &amp; Messaging</a></td><td>Queues vs Kafka, pub/sub, delivery guarantees, idempotent consumers, backpressure, DLQs</td><td>Week 6</td></tr>
 </table>
@@ -43,14 +43,14 @@ Pairs with the week-by-week <a href="../study-plan/system-design-curriculum.html
 <tr><td>7</td><td><a href="07-case-studies-foundational.html">URL Shortener &amp; Rate Limiter</a></td><td>Base62 keys, key-generation service, 301 vs 302; token bucket &amp; sliding windows, distributed limiting in Redis</td><td>Week 7</td></tr>
 <tr><td>8</td><td><a href="08-case-studies-feeds.html">News Feed &amp; Instagram</a></td><td>Fan-out on write vs read, the celebrity hybrid, feed caching, media pipeline, hot counters</td><td>Week 8</td></tr>
 <tr><td>9</td><td><a href="09-case-studies-realtime.html">Chat &amp; Notifications</a></td><td>WebSocket fleets, session routing, ack levels, dedupe &amp; ordering, presence, push pipelines (APNs/FCM)</td><td>Week 9</td></tr>
-<tr><td>10</td><td><a href="10-case-studies-media-storage.html">YouTube &amp; Dropbox</a></td><td>Transcoding DAG, adaptive bitrate streaming, content-hash chunking, delta sync, data plane vs control plane</td><td>Week 10</td></tr>
+<tr><td>10</td><td><a href="10-case-studies-media-storage.html">YouTube &amp; Dropbox</a></td><td>Transcoding DAG, adaptive bitrate streaming, content-hash chunking, delta sync, GFS/HDFS, data plane vs control plane</td><td>Week 10</td></tr>
 <tr><td>11</td><td><a href="11-case-studies-location-search.html">Uber &amp; Typeahead</a></td><td>Geohash vs quadtree, in-memory driver index, trie with precomputed top-K, offline rebuilds</td><td>Week 11</td></tr>
 </table>
 
 <h2>Part 3 — Senior depth</h2>
 <table>
 <tr><th>#</th><th>Topic</th><th>Covers</th><th>Plan week</th></tr>
-<tr><td>12</td><td><a href="12-advanced-distributed.html">Advanced Distributed Systems</a></td><td>CAP &amp; PACELC applied, consistency models, quorums, Raft/leader election, Bloom filters, circuit breakers &amp; resilience</td><td>Week 12</td></tr>
+<tr><td>12</td><td><a href="12-advanced-distributed.html">Advanced Distributed Systems</a></td><td>CAP &amp; PACELC applied, consistency models, quorums, Raft/leader election, heartbeats &amp; checksums, circuit breakers &amp; resilience</td><td>Week 12</td></tr>
 </table>
 
 <h2>How to study each week</h2>
@@ -63,5 +63,6 @@ Pairs with the week-by-week <a href="../study-plan/system-design-curriculum.html
 
 <p class="footer"><a href="../study-plan/index.html">← Back to study-plan overview</a> · <a href="../study-plan/flashcards.html">Flashcards →</a></p>
 </div>
+<script src="ask-claude.js" defer></script>
 </body>
 </html>

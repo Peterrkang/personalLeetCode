@@ -46,13 +46,21 @@
 <li>Classic failure modes worth naming in interviews:
   <ul>
   <li><strong>Thundering herd / cache stampede:</strong> a hot key expires and 10k requests hit the DB at once. Fix: per-key lock ("only one request recomputes"), or staggered/soft TTLs.</li>
-  <li><strong>Cache penetration:</strong> requests for keys that don't exist always miss to the DB. Fix: cache the negative result, or a Bloom filter in front.</li>
+  <li><strong>Cache penetration:</strong> requests for keys that don't exist always miss to the DB. Fix: cache the negative result, or a Bloom filter in front (§4).</li>
   <li><strong>Hot key:</strong> one celebrity key overloads a single cache node. Fix: replicate the key across nodes or add a local in-process cache.</li>
   </ul>
 </li>
 </ul>
 
-<h2>4. CDN</h2>
+<h2>4. Bloom filters</h2>
+<ul>
+<li>A <strong>probabilistic set</strong> in tiny memory: a bit array + k hash functions. Add a key → set its k bits. Query → check the k bits: any bit 0 = <strong>definitely not present</strong>; all 1 = <strong>probably present</strong>.</li>
+<li>False positives only, <strong>never false negatives</strong> — that asymmetry is the whole point. ~10 bits per element gives a ~1% false-positive rate: a billion keys fit in ~1.2 GB of RAM. Standard filters can't delete (bits are shared between keys); a counting variant can.</li>
+<li>Where it earns its keep: <strong>cache penetration</strong> (the fix from §3 — skip the DB for keys that can't exist), <strong>LSM databases</strong> (Cassandra/RocksDB consult a filter before touching each SSTable on disk), "username taken?" pre-checks, Chrome's malicious-URL list.</li>
+<li>Interview line: "a Bloom filter in front — if it says no, the key definitely isn't there and we skip the lookup; the ~1% false positives just do the lookup they would have done anyway."</li>
+</ul>
+
+<h2>5. CDN</h2>
 <ul>
 <li>A CDN is a globally distributed cache for content, terminating requests near the user — turns a 150 ms cross-ocean round trip into ~10 ms to an edge PoP.</li>
 <li><strong>Pull CDN</strong> (default): edge fetches from your origin on first miss, then caches per <code>Cache-Control</code>. Easy; first request per region is slow.</li>
@@ -60,7 +68,7 @@
 <li>Serve <strong>static assets</strong> (images, JS, video segments) from CDN always; cache-bust with hashed filenames (<code>app.3f2a1.js</code> + immutable TTL). Dynamic API responses can also be edge-cached briefly (e.g. 5 s) to absorb read storms.</li>
 </ul>
 
-<h2>5. Redundancy &amp; replication</h2>
+<h2>6. Redundancy &amp; replication</h2>
 <ul>
 <li><strong>Redundancy</strong> = extra copies of components (no single point of failure). <strong>Replication</strong> = keeping the copies of <em>data</em> in sync.</li>
 <li><strong>Leader-follower (primary-replica):</strong> writes go to the leader; followers replicate the log and serve reads. Read scaling for free; on leader death, promote a follower (<strong>failover</strong>).</li>
@@ -90,6 +98,7 @@
 <li>Write-through vs write-back — which risks data loss and why?</li>
 <li>Why is delete-on-write safer than update-on-write?</li>
 <li>What is a cache stampede and two ways to stop one?</li>
+<li>Why can a Bloom filter say "definitely not" but never "definitely yes"?</li>
 <li>Pull vs push CDN — when each?</li>
 <li>What is replication lag, and how does read-your-own-writes fix the UX?</li>
 </ul>
@@ -97,5 +106,6 @@
 
 <p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
 </div>
+<script src="ask-claude.js" defer></script>
 </body>
 </html>

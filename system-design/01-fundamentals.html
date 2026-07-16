@@ -60,13 +60,13 @@
 <tr><td>L1 cache reference</td><td>~1 ns</td></tr>
 <tr><td>Main memory (RAM) reference</td><td>~100 ns</td></tr>
 <tr><td>Read 1 MB sequentially from memory</td><td>~10 µs</td></tr>
-<tr><td>SSD random read</td><td>~100 µs</td></tr>
-<tr><td>Read 1 MB from SSD</td><td>~1 ms</td></tr>
+<tr><td>SSD (NVMe) random read</td><td>~20–100 µs</td></tr>
+<tr><td>Read 1 MB from SSD (NVMe)</td><td>~0.2–0.5 ms</td></tr>
 <tr><td>Round trip within same datacenter</td><td>~0.5 ms</td></tr>
-<tr><td>Disk (HDD) seek</td><td>~10 ms</td></tr>
+<tr><td>Disk (HDD) seek — cold/archival tiers only now</td><td>~10 ms</td></tr>
 <tr><td>Round trip CA ↔ Netherlands</td><td>~150 ms</td></tr>
 </table>
-<p>Takeaways: <strong>memory is ~100,000× faster than disk seeks</strong>; <strong>network round trips are expensive</strong> — minimize them; stay in the same region; cache aggressively.</p>
+<p>Takeaways: <strong>memory is ~1,000× faster than even NVMe</strong> and ~100,000× faster than an HDD seek; <strong>network round trips are expensive</strong> — minimize them; stay in the same region; cache aggressively. (Assume NVMe SSDs everywhere in modern designs; spinning disks survive only in cold-storage tiers like S3 Glacier.)</p>
 
 <h2>5. Back-of-the-envelope estimation</h2>
 <p>A repeatable recipe:</p>
@@ -121,5 +121,6 @@
 
 <p class="footer"><a href="index.html">← All topics</a> · <a href="../study-plan/index.html">Study-plan overview</a></p>
 </div>
+<script src="ask-claude.js" defer></script>
 </body>
 </html>
